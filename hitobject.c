@@ -2,7 +2,7 @@
 #include <libc.h>
 #include "hitobject.h"
 
-/* create a new object */
+/* creates a new object */
 hitobject *
 mkobj(uchar type, ulong t, int x, int y)
 {
@@ -34,7 +34,7 @@ nukeobj(hitobject *op)
 	free(op);
 }
 
-/* insert object into the list based on its time value.
+/* inserts an object into the list based on its time value.
   * returns a pointer to the list's head */
 hitobject *
 addobjt(hitobject *listp, hitobject *op)
@@ -61,7 +61,7 @@ addobjt(hitobject *listp, hitobject *op)
 	return listp;
 }
 
-/* set hitobject's time to 't', and adjust its position in the list */
+/* changes hitobject op's time to t, and adjust its position in listp */
 hitobject *
 moveobjt(hitobject *listp, hitobject *op, ulong t)
 {
@@ -70,7 +70,7 @@ moveobjt(hitobject *listp, hitobject *op, ulong t)
 	return addobjt(listp, op);
 }
 
-/* remove hitobject 'op' from 'listp' */
+/* removes the hitobject pointed to by op from listp */
 hitobject *
 rmobj(hitobject *listp, hitobject *op)
 {
@@ -95,8 +95,9 @@ rmobj(hitobject *listp, hitobject *op)
 	return nil; /* unreachable */ 
 }
 
-/* return a pointer to the first hitobject with time 't'.
-  * if no object has time 't', then return the last object where np->t < t */
+/* returns a pointer to an object with time t in listp.
+  * If no object in listp  has time t, lookupobjt returns the
+  * latest hitobject  whose timestamp comes before t in listp. */
 hitobject *
 lookupobjt(hitobject *listp, ulong t)
 {
@@ -112,9 +113,9 @@ lookupobjt(hitobject *listp, ulong t)
 	return np;
 }
 
-/* return a pointer to the 'n'th object.
-  * return nil if there is no 'n'th object.
-  * return the last object if 'n' is 0 */
+/* returns a pointer to the n-th object in listp.
+  * returns nil if there is no n-th object.
+  * returns the last object if n is 0 */
 hitobject *
 lookupobjn(hitobject *listp, uint n)
 {
@@ -136,7 +137,7 @@ lookupobjn(hitobject *listp, uint n)
 	return nil;
 }
 
-/* create a new anchor */
+/* creates a new anchor */
 anchor *
 mkanch(int x, int y)
 {
@@ -153,9 +154,9 @@ mkanch(int x, int y)
 	return new;
 }
 
-/* add anchor to anchor list in position 'n'.
-  * if i is 0, append anchor to the end of the list.
-   * returns a pointer to the anchor list's head */
+/* adds an anchor to alistp in position n.
+  * if n is 0, addanchn appends anchor to the end of the list.
+   * returns a pointer to the list's head */
 anchor *
 addanchn(anchor *alistp, anchor *ap, uint n)
 {

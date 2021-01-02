@@ -142,7 +142,7 @@ static int nfield = 0;		/* number of fields processed by csvsplit() */
 static char **fields = nil;	/* field pointers */
 
 
-/* free all getline & csvsplit-related static fields
+/* free all getline() & csvsplit()-related static fields
   * & reset their associated variables. it only makes sense
   * to call this function before reading a new line. */
 static
@@ -220,7 +220,7 @@ getline(int fd)
 	return line;
 }
 
-/* call getline until the next section header is read.
+/* call getline() until the next section header is read.
   * returns a pointer to line[], or nil on EOF. */
 static
 char *
@@ -237,7 +237,7 @@ nextsection(int fd)
 	return nil;
 }
 
-/* call getline, and return a pointer to line[], or 'nil' if line[] is empty. */
+/* call getline(), and return a pointer to line[], or 'nil' if line[] is empty. */
 static
 char *
 nextentry(int fd)
@@ -252,7 +252,7 @@ nextentry(int fd)
 		return line;
 }
 
-/* return a pointer to the end of a quoted field starting at 'p'.
+/* return a pointer to the end of a quoted field starting at p.
   * squashes sequences of two double quotes into one single instance. */
 static
 char *
@@ -273,9 +273,8 @@ advquoted(char *p, char *sepchar)
 	return p + j;
 }
 
-/* split line[] into distinct fields depending on the given separator
-  * character (sepchar). Returns the amount of split fields, or -1 if
-  * memory has run out.
+/* split line[] into distinct fields depending delimited by sepchar
+  * Returns the amount of split fields, or -1 if memory has run out.
   *
   * fields are freed on subsequent calls. The caller is responsible
   * for making a copy of the fields that they wish to use.
@@ -320,8 +319,8 @@ csvsplit(char *sepchar)
 	return nfield;
 }
 
-/* return a pointer to the 'n'th field in fields[], starting from 0.
-  * 'n' may be negative ('-1' = last field) */
+/* return a pointer to the n-th field in fields[], starting from 0.
+  * n may be negative ('-1' = last field) */
 static
 char *
 csvgetfield(int n)
@@ -355,7 +354,7 @@ getentry(char *q)
 }
 
 /* split line into key and value, and copy the value to the entries[]
-  * entry with a matching key. returns the relevant entry, or 'nil' if no
+  * entry with a matching key. returns the relevant entry, or nil if no
   * entry with the given key exists. this routine sets errstr.
   */
 static
@@ -391,11 +390,11 @@ kvsplit()
 	return ep;
 }
 
-/* convert the string pointed to by 's' into runes, up to the NULL character.
+/* convert the string pointed to by s into runes, up to the NULL character.
   * returns a pointer to a section of memory containing
   * the converted string.
   *
-  * returns 'nil' when out of memory.
+  * returns nil when out of memory.
   *
   * returns a Rune string containing only Runeerror if the NULL character
   * occurs in the middle of a UTF sequence. This  sets the error string,
@@ -640,6 +639,13 @@ hsobjects(beatmap *bmp, int fd)
 	return 0;
 }
 
+/* allocates a new beatmap object, loads .osu file
+  * data from fd, and calls the appropriate hs*() handler for each
+  * section.
+  * 
+  * this routine returns nil when out of memory, or if any handler
+  * exits with a less-than-zero return. All handlers set the errstr.
+  */
 beatmap *
 loadmap(int fd)
 {

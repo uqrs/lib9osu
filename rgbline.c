@@ -2,7 +2,7 @@
 #include <libc.h>
 #include "rgbline.h"
 
-/* create a new greenline */
+/* creates a new greenline */
 gline *
 mkgline(ulong t, double velocity, int volume, int kiai)
 {
@@ -20,14 +20,14 @@ mkgline(ulong t, double velocity, int volume, int kiai)
 	return new;
 }
 
-/* free a greenline; MUST call rmgline first if the greenline is in a list */
+/* frees a greenline; MUST call rmgline first if the greenline is in a list */
 void
 nukegline(gline *gline)
 {
 	free(gline);
 }
 
-/* insert a greenline into the list based on its time value.
+/* inserts a greenline into glistp based on its time value.
   * returns a pointer to the list's head */
 gline *
 addglinet(gline *glistp, gline *glp)
@@ -54,7 +54,7 @@ addglinet(gline *glistp, gline *glp)
 	return glistp;
 }
 
-/* set greenline's time to 't' and adjust its position in the list */
+/* changes greenline glp's time to t and adjust its position in the glistp */
 gline *
 movegline(gline *glistp, gline *glp, ulong t)
 {
@@ -63,7 +63,7 @@ movegline(gline *glistp, gline *glp, ulong t)
 	return addglinet(glistp, glp);
 }
 
-/* remove greenline 'glp' from 'glistp' */
+/* removes the greenline pointed to by glp from glistp */
 gline *
 rmgline(gline *glistp, gline *glp)
 {
@@ -88,7 +88,7 @@ rmgline(gline *glistp, gline *glp)
 	return nil; /* unreachable */
 }
 
-/* create a new redline */
+/* creates a new redline */
 rline *
 mkrline(ulong t, ulong duration, int beats, int volume, int kiai)
 {
@@ -107,14 +107,14 @@ mkrline(ulong t, ulong duration, int beats, int volume, int kiai)
 	return new;
 }
 
-/* free a redline; MUST call rmrline first if the redline is in a list */
+/* frees a redline; MUST call rmrline first if the redline is in a list */
 void
 nukerline(rline *rlp)
 {
 	free(rlp);
 }
 
-/* insert a redline into the list based on its time value.
+/* inserts a redline into the list based on its time value.
   * returns a pointer to the list's head */
 rline *
 addrlinet(rline *rlistp, rline *rlp)
@@ -141,7 +141,7 @@ addrlinet(rline *rlistp, rline *rlp)
 	return rlistp;
 }
 
-/* set redline's time to 't' and adjust its position in the list */
+/* changes redline's time to t and adjust its position in the list */
 rline *
 moverline(rline *rlistp, rline *rlp, ulong t)
 {
@@ -150,7 +150,7 @@ moverline(rline *rlistp, rline *rlp, ulong t)
 	return addrlinet(rlistp, rlp);
 }
 
-/* remove redline 'rlp' from 'rlistp' */
+/* removes redline rlp from rlistp */
 rline *
 rmrline(rline *rlistp, rline *rlp)
 {
