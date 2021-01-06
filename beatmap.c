@@ -152,9 +152,7 @@ reset()
 	free(line);
 	free(fields);
 
-	nfield = 0;
-
-	maxchar = maxfield = 0;
+	maxchar = maxfield = nfield = 0;
 	line = nil;
 	fields = nil;
 }
@@ -244,9 +242,7 @@ nextentry(int fd)
 {
 	char *line = getline(fd);
 
-	if (line == nil)
-		return nil;
-	else if (line[0] == '\0')
+	if (line == nil || line[0] == '\0')
 		return nil;
 	else
 		return line;
@@ -294,8 +290,8 @@ csvsplit(char *sepchar)
 
 	nfield = 0;
 	maxfield = 9;
-	fields = malloc(sizeof(char *) * maxfield);
 
+	fields = malloc(sizeof(char *) * maxfield);
 	if (fields == nil)
 		return -1;
 
@@ -303,6 +299,9 @@ csvsplit(char *sepchar)
 		if (nfield+1 >= maxfield) {
 			maxfield *= 2;
 			fields = realloc(fields, sizeof(char *) * maxfield);
+
+			if (fields == nil)
+				return -1;
 		}
 
 		if (p[0] == '"')
@@ -450,6 +449,9 @@ strrunedup(char *s)
 	return out;
 }
 
+/* deserialises all [General] entries into the appropriate beatmap struct fields.
+  * returns 0 on success, BADKEY on an illegal configuration key, or NOMEM
+  * when out of memory. */
 static
 int
 hsgeneral(beatmap *bmp, int fd)
@@ -477,6 +479,9 @@ hsgeneral(beatmap *bmp, int fd)
 	return 0;
 }
 
+/* deserialises all [Metadata] entries into the appropriate beatmap struct fields.
+  * returns 0 on success, BADKEY on an illegal configuration key, or NOMEM
+  * when out of memory. */
 static
 int
 hsmetadata(beatmap *bmp, int fd)
@@ -500,10 +505,25 @@ hsmetadata(beatmap *bmp, int fd)
 	return 0;
 }
 
+/* deserialises all [Difficulty] entries into the appropriate beatmap struct fields.
+  * returns 0 on success, BADKEY on an illegal configuration key, or NOMEM
+  * when out of memory. */
 static
 int
 hsdifficulty(beatmap *bmp, int fd)
 {
+	while (nextentry(fd) != nil) {
+		if (kvsplit() == nil)
+			return BADKEY;
+	}
+
+	bmp->hp = (float) atof(getentry("HPDrainRate")->value);
+	bmp->cs = (float) atof(getentry("CircleSize")->value);
+	bmp->od = (float) atof(getentry("OverallDifficulty")->value);
+	bmp->ar = (float) atof(getentry("ApproachRate")->value);
+	bmp->slmultiplier = (float) atof(getentry("SliderMultiplier")->value);
+	bmp->sltickrate = atoi(getentry("SliderTickRate")->value);
+
 	return 0;
 }
 
@@ -514,18 +534,23 @@ hsevents(beatmap *bmp, int fd)
 	return 0;
 }
 
+/* deserialises all [TimingPoints] entries into rline and gline objects, and adds
+  * them to bmp's list.
+  * returns 0 on success, BADLINE on illegal line type, or NOMEM
+  * when out of memory. This routine sets the errstr. */
 static
 int
 hstimingpoints(beatmap *bmp, int fd)
 {
-	int n, isredline;
+	int isredline;
 	int t, beats, volume, effects, kiai;
 	double velocity;
 	ulong duration;
 	void *lp;
 
 	while (nextentry(fd) != nil) {
-		n = csvsplit(",");
+		if (csvsplit(",") < 0)
+			return NOMEM;
 
 		t = atol(csvgetfield(LNTIME));
 		volume = atoi(csvgetfield(LNVOLUME));
@@ -568,6 +593,10 @@ hstimingpoints(beatmap *bmp, int fd)
 	return 0;
 }
 
+/* deserialises all [HitObjects] entries into hitobject objects, and adds
+  * them to bmp's list.
+  * returns 0 on success, BADLINE on illegal line type, or NOMEM
+  * when out of memory. This routine sets the errstr. */
 static
 int
 hsobjects(beatmap *bmp, int fd)
@@ -579,7 +608,8 @@ hsobjects(beatmap *bmp, int fd)
 	char *xs, *ys;
 
 	while (nextentry(fd) != nil) {
-		n = csvsplit(",");
+		if (csvsplit(",") < 0)
+			return NOMEM;
 
 		t = (ulong) atol(csvgetfield(OBJTIME));
 		x = atoi(csvgetfield(OBJX));
@@ -589,6 +619,11 @@ hsobjects(beatmap *bmp, int fd)
 
 		if ((op = mkobj(type, t, x, y)) == nil)
 			return NOMEM;
+
+		if (typeb & TBNEWCOMBO) {
+			op->newcombo = 1;
+			op->comboskip = (typeb & TBCOLOR) >> TBCOLORSHIFT;
+		}
 
 		switch (type) {
 		case TCIRCLE:
@@ -600,7 +635,8 @@ hsobjects(beatmap *bmp, int fd)
 			/* hitsounding goes here .... */
 
 			setline(csvgetfield(OBJCURVES));
-			n = csvsplit("|");
+			if ((n = csvsplit("|")) < 0)
+				return NOMEM;
 
 			curvetype = csvgetfield(OBJCURVETYPE);
 			if (curvetype == nil)
@@ -628,11 +664,6 @@ hsobjects(beatmap *bmp, int fd)
 			return BADOBJECT;
 		}
 
-		if (typeb & TBNEWCOMBO) {
-			op->newcombo = 1;
-			op->comboskip = (typeb & TBCOLOR) >> TBCOLORSHIFT;
-		}
-
 		bmp->objects = addobjt(bmp->objects, op);
 	}
 
@@ -644,7 +675,7 @@ hsobjects(beatmap *bmp, int fd)
   * section.
   * 
   * this routine returns nil when out of memory, or if any handler
-  * exits with a less-than-zero return. All handlers set the errstr.
+  * exits with a less-than-zero return. Some handlers set the errstr.
   */
 beatmap *
 loadmap(int fd)

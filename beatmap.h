@@ -17,6 +17,13 @@ typedef struct beatmap {
 	uchar stackleniency;/* stack leniency */
 	uchar mode;		/* force gameplay mode */
 
+	float hp;			/* HP drain rate */
+	float cs;			/* circle size */
+	float ar;			/* approach rate */
+	float od;			/* overall difficulty */
+	float slmultiplier;	/* slider velocity multiplier */
+	int sltickrate;		/* slider tick rate */
+
 	int letterbox;		/* letterbox screen in breaks */
 	int widescreensb;	/* widescreen storyboard */
 	

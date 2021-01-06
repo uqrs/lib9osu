@@ -42,6 +42,7 @@ main(int argc, char *argv[])
 	else {
 		print("%s - %s [%s] by %s\n", bmp->artist, bmp->title, bmp->diffname, bmp->author);
 		print("%S - %S [%s] by %s\n", bmp->utf8artist, bmp->utf8title, bmp->diffname, bmp->author);
+		print("CS %f AR %f HP %f OD %f sv %f tick: %d\n", bmp->cs, bmp->ar, bmp->hp, bmp->od, bmp->slmultiplier, bmp->sltickrate);
 
 		for (hitobject *np = bmp->objects; np; np = np->next) {
 			print("%s", types[np->type-1]);
