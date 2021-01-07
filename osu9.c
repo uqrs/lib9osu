@@ -79,5 +79,9 @@ main(int argc, char *argv[])
 
 	}
 
+	print("\n");
+	for (int q = 0; q < bmp->ncolours; q++)
+		print("Combo%d = #%X\n", q+1, bmp->colours[q]);
+
 	exits(0);
 }

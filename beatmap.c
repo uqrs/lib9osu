@@ -18,6 +18,7 @@ static int hsmetadata(beatmap *bmp, int fd);
 static int hsdifficulty(beatmap *bmp, int fd);
 static int hsevents(beatmap *bmp, int fd);
 static int hstimingpoints(beatmap *bmp, int fd);
+static int hscolours(beatmap *bmp, int fd);
 static int hsobjects(beatmap *bmp, int fd);
 
 typedef struct handler {
@@ -31,6 +32,7 @@ static handler handlers[] = {
 	{.section = "[Difficulty]", .func = hsdifficulty},
 	{.section = "[Events]", .func = hsevents},
 	{.section = "[TimingPoints]", .func = hstimingpoints},
+	{.section = "[Colours]", .func = hscolours},
 	{.section = "[HitObjects]", .func = hsobjects},
 };
 
@@ -78,12 +80,22 @@ static entry entries[] = {
 	{.key = "ApproachRate", .value = nil},
 	{.key = "SliderMultiplier", .value = nil},
 	{.key = "SliderTickRate", .value = nil},
+
+	/* [Colours] */
+	{.key = "Combo1", .value = nil},
+	{.key = "Combo2", .value = nil},
+	{.key = "Combo3", .value = nil},
+	{.key = "Combo4", .value = nil},
+	{.key = "Combo5", .value = nil},
+	{.key = "Combo6", .value = nil},
+	{.key = "Combo7", .value = nil},
+	{.key = "Combo8", .value = nil},
 };
 
 /* CSV field labels for hitobject entries 
   * See: https://osu.ppy.sh/wiki/en/osu%21_File_Formats/Osu_%28file_format%29#hit-objects
   */
-static enum objfields {
+enum {
 	OBJSAMPLE=-1,	/* hitsound sampleset (final field) */
 	OBJX=0,			/* x position of object */
 	OBJY,			/* y position of object */
@@ -96,25 +108,25 @@ static enum objfields {
 	OBJLENGTH,		/* ""visual length in osu! pixels"" */
 	OBJEDGESOUNDS,	/* slider head/tail hitsounds */
 	OBJEDGESETS,		/* slider head/tail sample sets */
-} objfields;
+};
 
 /* C(olon)SV and P(ipe)SV fields for OBJCURVES and OBJSAMPLE */
-static enum colpipefields {
+enum {
 	OBJCURVETYPE=0,
-} colpipefields;
+};
 
 /* bitmasks for the OBJTYPE field; apply with & */
-static enum objtypebits {
+enum {
 	TBTYPE = 0xB,			/* circle, spinner, or slider type */
 	TBNEWCOMBO = 0x4,	/* new combo */
 	TBCOLOR = 0x70,		/* amount of colours to skip */
 	TBCOLORSHIFT = 4,		/* shift right amount after having applied & TCOLOR  */
 	TBHOLD = 0x80, 		/* unsupported; nobody cares about osu!mania */
-} objtypebits;
+};
 
 /* CSV fields for red/greenline entries 
   * see: https://osu.ppy.sh/wiki/en/osu%21_File_Formats/Osu_%28file_format%29#timing-points */
-static enum lnfields {
+enum {
 	LNTIME=0,		/* timestamp in miliseconds */
 	LNDURATION=1,	/* duration of beat in miliseconds (redline only) */
 	LNVELOCITY=1,	/* negative inverse slider velocity multiplier (greenline only) */
@@ -124,13 +136,20 @@ static enum lnfields {
 	LNVOLUME,		/* volume percentage */
 	LNREDLINE,		/* if 1, this is a redline */
 	LNEFFECTS,		/* extra effects */
-} lnfields;
+};
 
 /* bitmasks for the LNEFFECTS field; apply with & */
-static enum lneffectbits {
+enum {
 	EBKIAI = 0x1,		/* kiai time enabled */
 	EBOMIT = 0x8,		/* unused; nobody cares about osu!taiko or osu!mania */
-} lneffectbits;
+};
+
+/* colour code csv fields */
+enum {
+	RED=0,
+	GREEN,
+	BLUE,
+};
 
 static int maxchar = 256;	/* size of line[] */
 static char *line = nil;	/* line read by getline() */
@@ -339,17 +358,32 @@ static
 entry *
 getentry(char *q)
 {
+	int n;
 	int nentry = sizeof(entries) / sizeof(entry);
 
 	if (q == nil)
 		return nil;
 
-	for (int n = 0; n < nentry; n++) {
+	for (n = 0; n < nentry; n++) {
 		if (strcmp(q, entries[n].key) == 0)
 			return &entries[n];
 	}
 
 	return nil;
+}
+
+/* free all .value strings in entries[] and assign nil to each one. */
+static
+void
+resetentries()
+{
+	int nentry = sizeof(entries) / sizeof(entry);
+	int n;
+
+	for (n = 0; n < nentry; n++) {
+		free(entries[n].value);
+		entries[n].value = nil;
+	}
 }
 
 /* split line into key and value, and copy the value to the entries[]
@@ -405,6 +439,7 @@ strrunedup(char *s)
 {
 	int nrune = 0;
 	int maxrune = 16;
+	int i, j;
 	Rune *out;
 
 	out = malloc(sizeof(Rune) * maxrune);
@@ -412,7 +447,7 @@ strrunedup(char *s)
 	if (out == nil)
 		return nil;
 
-	for (int i = 0; s[i] != '\0'; i++) {
+	for (i = 0; s[i] != '\0'; i++) {
 		if (nrune+1 >= maxrune) {
 			maxrune *= 2;
 			out = realloc(out, sizeof(Rune) * maxrune);
@@ -428,7 +463,7 @@ strrunedup(char *s)
 		char buf[UTFmax];
 		buf[0] = s[i++];
 
-		for (int j = 1;;i++) {
+		for (j = 1;;i++) {
 			if (s[i] == '\0') {
 				out[0] = Runeerror;
 				out[1] = '\0';
@@ -593,6 +628,64 @@ hstimingpoints(beatmap *bmp, int fd)
 	return 0;
 }
 
+/* converts red, green and blue values to a hexadecimal colour code */
+static
+long
+rgbtohex(int r, int g, int b)
+{
+	return ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | ((b & 0xFF) << 0);
+}
+
+/* deserialises all [Colours] entries into hexadecimal colour codes, and
+  * adds them to bmp->colours.
+  * returns 0 on success, or NOMEM when out of memory. */
+static
+int
+hscolours(beatmap *bmp, int fd)
+{
+	int r, g, b;
+	int i;
+	int n = 0;
+	char *key;
+	entry *ep;
+
+	while (nextentry(fd) != nil) {
+		if (kvsplit() == nil)
+			return BADKEY;
+		n++;
+	}
+
+	bmp->ncolours = n;
+	bmp->colours = malloc(sizeof(long) * n);
+	if (bmp->colours == nil)
+		return NOMEM;
+
+	key = malloc(sizeof(char) * 7); /* Enough to store "Combo#" */
+	if (key == nil) {
+		free(bmp->colours);
+		bmp->colours = nil;
+		return NOMEM;
+	}
+
+	for (i = 0; i < n; i++) {
+		sprint(key, "Combo%d", i + 1);
+		ep = getentry(key);
+
+		setline(ep->value);
+		csvsplit(",");
+
+		r = atoi(csvgetfield(RED));
+		g = atoi(csvgetfield(GREEN));
+		b = atoi(csvgetfield(BLUE));
+
+		bmp->colours[i] = rgbtohex(r, g, b);
+	}
+
+	free(key);
+
+	return 0;
+}
+
 /* deserialises all [HitObjects] entries into hitobject objects, and adds
   * them to bmp's list.
   * returns 0 on success, BADLINE on illegal line type, or NOMEM
@@ -603,7 +696,7 @@ hsobjects(beatmap *bmp, int fd)
 {
 	hitobject *op;
 	int t, x, y, type, typeb;
-	int n;
+	int n, i;
 	char *curvetype;
 	char *xs, *ys;
 
@@ -644,7 +737,7 @@ hsobjects(beatmap *bmp, int fd)
 
 			op->curve = curvetype[0];
 
-			for (int i = 1; i < n; i++) {
+			for (i = 1; i < n; i++) {
 				xs = csvgetfield(i);
 				ys = xs + strcspn(xs, ":");
 				ys[0] = '\0';
@@ -681,14 +774,17 @@ beatmap *
 loadmap(int fd)
 {
 	char *s;
+	int i;
 	int nhandler = sizeof(handlers) / sizeof(handler);
 
 	beatmap *new = malloc(sizeof(beatmap));
 	if (new == nil)
 		return nil;
 
+	resetentries();
+
 	while ((s = nextsection(fd)) != nil) {
-		for (int i = 0; i < nhandler; i++) {
+		for (i = 0; i < nhandler; i++) {
 			if (strcmp(s, handlers[i].section) == 0)
 				if (handlers[i].func(new, fd) < 0)
 					return nil;
