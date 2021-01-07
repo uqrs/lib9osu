@@ -84,6 +84,17 @@ main(int argc, char *argv[])
 	for (int q = 0; q < bmp->ncolours; q++)
 		print("Combo%d = #%X\n", q+1, bmp->colours[q]);
 
+	print("\n");
+	for (int b = 0; b < bmp->nbookmarks; b++)
+		print("Bookmark #%d %d\n", b+1, bmp->bookmarks[b]);
+
+	print("\n");
+	print("%f %f %d %f\n", bmp->distancesnap, bmp->beatdivisor, bmp->gridsize, bmp->timelinezoom);
+
+	print("\n");
+	print("%d\n", strlen(bmp->events)+1);
+	print("%s", bmp->events);
+
 	nukebeatmap(bmp);
 
 	exits(0);

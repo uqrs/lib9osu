@@ -4,9 +4,9 @@ typedef struct beatmap {
 	Rune *audiof;		/* relative path to mp3 file */
 	ulong leadin;		/* milliseconds before audio begins playing */
 	ulong previewt;	/* time in milliseconds when audio preview should start */
-	uchar countdown;	/* countdown timer speed */
-	uchar stackleniency;/* stack leniency */
-	uchar mode;		/* force gameplay mode */
+	int countdown;		/* countdown timer speed */
+	int stackleniency;	/* stack leniency */
+	int mode;			/* force gameplay mode */
 	int letterbox;		/* letterbox screen in breaks */
 	int widescreensb;	/* widescreen storyboard */
 
@@ -15,6 +15,8 @@ typedef struct beatmap {
 	int nbookmarks;	/* number of bookmarks in *bookmarks */
 	float distancesnap;	/* distance snap multiplier */
 	float beatdivisor;	/* beat snap divisor */
+	int gridsize;		/* grid size */
+	float timelinezoom;	/* editor timeline zoom */
 
 	/* [Metadata] */
 	char *title;		/* song title */
@@ -36,14 +38,14 @@ typedef struct beatmap {
 	int sltickrate;		/* slider tick rate */
 
 	/* [Events] */
-	char *events;		/* raw contents of the [Events] section sans carriage returns. */
+	char *events;		/* raw contents of the [Events] section sans carriage returns */
 
 	/* [TimingPoints] */
 	rline *rlines;		/* head of redline list */
 	gline *glines;		/* head of greenline list */
 
 	/* [Colours] */
-	long *colours;		/* combo colour hex codes */
+	long *colours;		/* combo colour hex codes. nil for default colours */
 	int ncolours;		/* number of colours in *colours */
 
 	/* [HitObjects] */
@@ -58,4 +60,6 @@ enum {
 	BADLINE=-5,
 };
 
-beatmap *loadmap(int fd);
+beatmap *mkbeatmap();
+void nukebeatmap(beatmap *bmp);
+int loadmap(beatmap *bmp, int fd);

@@ -14,6 +14,7 @@
 
 /* beatmap section handler prototypes */
 static int hsgeneral(beatmap *bmp, int fd);
+static int hseditor(beatmap *bmp, int fd);
 static int hsmetadata(beatmap *bmp, int fd);
 static int hsdifficulty(beatmap *bmp, int fd);
 static int hsevents(beatmap *bmp, int fd);
@@ -28,6 +29,7 @@ typedef struct handler {
 
 static handler handlers[] = {
 	{.section = "[General]", .func = hsgeneral},
+	{.section = "[Editor]", .func = hseditor},
 	{.section = "[Metadata]", .func = hsmetadata},
 	{.section = "[Difficulty]", .func = hsdifficulty},
 	{.section = "[Events]", .func = hsevents},
@@ -203,11 +205,13 @@ static
 char *
 getline(int fd)
 {
-	int nchar = 0, nread = 0;
+	int nchar;
+	int nread;
 	char c;
 
 	reset();
 	maxchar = 256;
+	nchar = 0;
 	line = malloc(sizeof(char) * maxchar);
 
 	if (line == nil)
@@ -219,7 +223,7 @@ getline(int fd)
 		else if (c == '\r')
 			continue;
 
-		if (nchar+1 >= maxchar) {
+		if (nchar+1 > maxchar) {
 			maxchar *= 2;
 			line = realloc(line, sizeof(char) * maxchar);
 
@@ -315,7 +319,7 @@ csvsplit(char *sepchar)
 		return -1;
 
 	do {
-		if (nfield+1 >= maxfield) {
+		if (nfield+1 > maxfield) {
 			maxfield *= 2;
 			fields = realloc(fields, sizeof(char *) * maxfield);
 
@@ -448,7 +452,7 @@ strrunedup(char *s)
 		return nil;
 
 	for (i = 0; s[i] != '\0'; i++) {
-		if (nrune+1 >= maxrune) {
+		if (nrune+1 > maxrune) {
 			maxrune *= 2;
 			out = realloc(out, sizeof(Rune) * maxrune);
 
@@ -502,14 +506,46 @@ hsgeneral(beatmap *bmp, int fd)
 
 	bmp->leadin = (ulong) atol(getentry("AudioLeadIn")->value);
 	bmp->previewt = (ulong) atol(getentry("PreviewTime")->value);
-	bmp->countdown = (uchar) atoi(getentry("Countdown")->value);
-	bmp->stackleniency = (uchar) atoi(getentry("StackLeniency")->value);
-	bmp->mode = (uchar) atoi(getentry("Mode")->value);
-	bmp->letterbox = (uchar) atoi(getentry("LetterboxInBreaks")->value);
-	bmp->widescreensb = (uchar) atoi(getentry("WidescreenStoryboard")->value);
+	bmp->countdown = atoi(getentry("Countdown")->value);
+	bmp->stackleniency = atoi(getentry("StackLeniency")->value);
+	bmp->mode = atoi(getentry("Mode")->value);
+	bmp->letterbox = atoi(getentry("LetterboxInBreaks")->value);
+	bmp->widescreensb = atoi(getentry("WidescreenStoryboard")->value);
 	/* p9p's atof(3) routines don't handle the error string properly, and
 	  * some of these values may genuinely be zero. Take a leap of
 	  * faith here... */
+
+	return 0;
+}
+
+static
+int
+hseditor(beatmap *bmp, int fd)
+{
+	int n;
+	int i;
+
+	while (nextentry(fd) != nil) {
+		if (kvsplit() == nil)
+			return BADKEY;
+	}
+
+	setline(getentry("Bookmarks")->value);
+	if ((n = csvsplit(",")) != 0) {
+		bmp->bookmarks = malloc(sizeof(ulong) * n);
+		if (bmp->bookmarks == nil)
+			return NOMEM;
+
+		for (i = 0; i < n; i++)
+			bmp->bookmarks[i] = (ulong) atol(csvgetfield(i));
+
+		bmp->nbookmarks = n;
+	}
+
+	bmp->distancesnap = atof(getentry("DistanceSpacing")->value);
+	bmp->beatdivisor = atof(getentry("BeatDivisor")->value);
+	bmp->gridsize = atoi(getentry("GridSize")->value);
+	bmp->timelinezoom = atof(getentry("TimelineZoom")->value);
 
 	return 0;
 }
@@ -562,10 +598,45 @@ hsdifficulty(beatmap *bmp, int fd)
 	return 0;
 }
 
+/* the author doesn't care about storyboarding. As such, hsevents copies the
+  * raw [Events] contents into a character string, with carriage returns restored.
+  *
+  * returns 0 on success, or NOMEM when out of memory. */
 static
 int
 hsevents(beatmap *bmp, int fd)
 {
+	int nchar;
+	int maxchar;
+	int len;
+	char *linep;
+
+	nchar = 0;
+	maxchar = 256;
+	bmp->events = malloc(sizeof(char) * maxchar);
+	if (bmp->events == nil)
+		return NOMEM;
+
+	while ((linep = nextentry(fd)) != nil) {
+		len = strlen(linep);
+
+		/* + 2 for carriage return and newline */
+		if (nchar + len + 2 > maxchar) {
+			do {
+				maxchar *= 2;
+			} while (nchar + len + 2 > maxchar);
+
+			bmp->events = realloc(bmp->events, sizeof(char) * maxchar);
+			if (bmp->events == nil)
+				return NOMEM;
+		}
+
+		strcat(bmp->events, linep);
+		strcat(bmp->events, "\r\n");
+
+		nchar += len + 2;
+	}
+
 	return 0;
 }
 
@@ -601,7 +672,8 @@ hstimingpoints(beatmap *bmp, int fd)
 			beats = atol(csvgetfield(LNBEATS));
 
 			lp = (rline *)lp;
-			if ((lp = mkrline(t, duration, beats, volume, kiai)) == nil)
+			lp = mkrline(t, duration, beats, volume, kiai);
+			if (lp == nil)
 				return NOMEM;
 
 			bmp->rlines = addrlinet(bmp->rlines, lp);
@@ -611,7 +683,8 @@ hstimingpoints(beatmap *bmp, int fd)
 			velocity = strtod(csvgetfield(LNVELOCITY), nil);
 
 			lp = (gline *)lp;
-			if ((lp = mkgline(t, velocity, volume, kiai)) == nil)
+			lp = mkgline(t, velocity, volume, kiai);
+			if (lp == nil)
 				return NOMEM;
 
 			bmp->glines = addglinet(bmp->glines, lp);
@@ -710,7 +783,8 @@ hsobjects(beatmap *bmp, int fd)
 		typeb = atoi(csvgetfield(OBJTYPE));
 		type = typeb & TBTYPE;
 
-		if ((op = mkobj(type, t, x, y)) == nil)
+		op = mkobj(type, t, x, y);
+		if (op == nil)
 			return NOMEM;
 
 		if (typeb & TBNEWCOMBO) {
@@ -779,6 +853,8 @@ mkbeatmap()
 	new->bookmarks = nil;
 	new->nbookmarks = 0;
 	new->distancesnap = new->beatdivisor = 0;
+	new->gridsize = 0;
+	new->timelinezoom = 0;
 
 	new->title = new->artist = new->author = nil;
 	new->diffname = new->source = new->tags = nil;
