@@ -35,7 +35,8 @@ main(int argc, char *argv[])
 	if (fd == -1)
 		print("You fucked up: %r\n");
 
-	beatmap *bmp = loadmap(fd);
+	beatmap *bmp = mkbeatmap();
+	loadmap(bmp, fd);
 
 	if (bmp == nil)
 		print("%r\n");
@@ -82,6 +83,8 @@ main(int argc, char *argv[])
 	print("\n");
 	for (int q = 0; q < bmp->ncolours; q++)
 		print("Combo%d = #%X\n", q+1, bmp->colours[q]);
+
+	nukebeatmap(bmp);
 
 	exits(0);
 }

@@ -7,7 +7,6 @@ hitobject *
 mkobj(uchar type, ulong t, int x, int y)
 {
 	hitobject *new = malloc(sizeof(hitobject));
-
 	if (new == nil)
 		return nil;
 
@@ -141,9 +140,7 @@ lookupobjn(hitobject *listp, uint n)
 anchor *
 mkanch(int x, int y)
 {
-	anchor *new;
-	new = (anchor *) malloc(sizeof(anchor));
-
+	anchor *new = (anchor *) malloc(sizeof(anchor));
 	if (new == nil)
 		return nil;
 

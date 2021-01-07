@@ -763,34 +763,115 @@ hsobjects(beatmap *bmp, int fd)
 	return 0;
 }
 
-/* allocates a new beatmap object, loads .osu file
-  * data from fd, and calls the appropriate hs*() handler for each
-  * section.
-  * 
-  * this routine returns nil when out of memory, or if any handler
-  * exits with a less-than-zero return. Some handlers set the errstr.
-  */
+/* creates a new beatmap object. returns nil when out of memory. */
 beatmap *
-loadmap(int fd)
+mkbeatmap()
 {
-	char *s;
-	int i;
-	int nhandler = sizeof(handlers) / sizeof(handler);
-
 	beatmap *new = malloc(sizeof(beatmap));
 	if (new == nil)
 		return nil;
+
+	new->audiof = nil;
+	new->leadin = new->previewt = 0;
+	new->countdown = new->stackleniency = 0;
+	new->mode = new->letterbox = new->widescreensb = 0;
+
+	new->bookmarks = nil;
+	new->nbookmarks = 0;
+	new->distancesnap = new->beatdivisor = 0;
+
+	new->title = new->artist = new->author = nil;
+	new->diffname = new->source = new->tags = nil;
+	new->utf8title = new->utf8artist = nil;
+	new->id = new->setid = 0;
+
+	new->hp = new->cs = new->ar = new->od = 0;
+	new->slmultiplier = 0;
+	new->sltickrate = 0;
+
+	new->events = nil;
+
+	new->rlines = nil;
+	new->glines = nil;
+
+	new->colours = nil;
+	new->ncolours = 0;
+
+	new->objects= nil;
+
+	return new;
+}
+
+/* frees a beatmap object, INCLUDING all objects, red- and greenlines, and strings. */
+void
+nukebeatmap(beatmap *bmp)
+{
+	rline *rlp, *rnext;
+	gline *glp, *gnext;
+	hitobject *op, *onext;
+
+	free(bmp->audiof);
+
+	free(bmp->bookmarks);
+
+	free(bmp->title);
+	free(bmp->utf8title);
+	free(bmp->artist);
+	free(bmp->utf8artist);
+	free(bmp->author);
+	free(bmp->diffname);
+	free(bmp->source);
+	free(bmp->tags);
+
+	free(bmp->events);
+
+	for (rlp = bmp->rlines; rlp != nil; rlp = rnext) {
+		rnext = rlp->next;
+		nukerline(rlp);
+	}
+
+	for (glp = bmp->glines; glp != nil; glp = gnext) {
+		gnext = glp->next;
+		nukegline(glp);
+	}
+
+	free(bmp->colours);
+
+	for (op = bmp->objects; op != nil; op = onext) {
+		onext = op->next;
+		nukeobj(op);
+	}
+}
+
+/* loads .osu file data from fd, and calls the appropriate hs*() 
+  * handler for each section, which in turn fill bmp with the appropriate
+  * data.
+  * 
+  * this routine returns 0 on success, NOMEM when out of memory, or
+  * the exit code of a handler function if it is less than 0. Some handlers
+  * set the errstr.
+  */
+int
+loadmap(beatmap *bmp, int fd)
+{
+	char *s;
+	int i;
+	int exit;
+	int nhandler = sizeof(handlers) / sizeof(handler);
+
+	if (bmp == nil)
+		return NOMEM;
 
 	resetentries();
 
 	while ((s = nextsection(fd)) != nil) {
 		for (i = 0; i < nhandler; i++) {
 			if (strcmp(s, handlers[i].section) == 0)
-				if (handlers[i].func(new, fd) < 0)
-					return nil;
+				if ((exit = handlers[i].func(bmp, fd)) < 0)
+					return exit;
 		}
 	}
 
-	return new;
+	return 0;
 }
 
