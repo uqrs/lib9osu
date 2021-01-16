@@ -6,6 +6,7 @@
 #include "rgbline.h"
 #include "hitobject.h"
 #include "beatmap.h"
+#include "hitsound.h"
 
 char *types[] = {
 	"Circle",
@@ -17,6 +18,44 @@ char *types[] = {
 	"",
 	"Spinner",
 };
+
+char *sounds[] = {
+	"Normal, ",
+	"Whistle, ",
+	"Finish, ",
+	"Clap, ",
+};
+
+char *sets[] = {
+	"None",
+	"Normal",
+	"Soft",
+	"Drum",
+};
+
+static
+char *
+gethsnames(int sbits)
+{
+	char *out;
+	out = malloc(39 * sizeof(char));
+	out[0] = '\0';
+	if (sbits == 0)
+		strcat(out, "None, ");
+	if (sbits & ADBNORMAL)
+		strcat(out, sounds[0]);
+	if (sbits & ADBWHISTLE)
+		strcat(out, sounds[1]);
+	if (sbits & ADBFINISH)
+		strcat(out, sounds[2]);
+	if (sbits & ADBCLAP)
+		strcat(out, sounds[3]);
+
+	int l = strlen(out);
+	out[l-2] = '\0';
+
+	return out;
+}
 
 void
 main(int argc, char *argv[])
@@ -58,11 +97,25 @@ main(int argc, char *argv[])
 				for (anchor *ap = np->alistp; ap != nil; ap = ap->next)
 					print(" %d,%d", ap->x, ap->y);
 
+				print(") (");
+
+				print("%s", gethsnames(np->sladditions[0]));
+				for (int y = 1; y < np->nsladdition; y++)
+					print(" // %s", gethsnames(np->sladditions[y]));
+
+				print(") (");
+
+				print("%s:%s", sets[np->slnormalsets[0]], sets[np->sladditionsets[0]]);
+				for (int y = 1; y < np->nsladdition; y++)
+					print(" // %s:%s", sets[np->slnormalsets[y]], sets[np->sladditionsets[y]]);
+
 				print(")\n");
+
 			} else if (np->type == TSPINNER) {
 				print("(Duration: %dms)\n", np->spinnerlength);
 			} else {
-				print("\n");
+				print("(%s) ", gethsnames(np->additions));
+				print("(%s:%s)\n", sets[np->normalset], sets[np->additionset]);
 			}
 		}
 
@@ -70,13 +123,13 @@ main(int argc, char *argv[])
 		n = 0;
 
 		for (gline *glp = bmp->glines; glp; glp = glp->next)
-			print("Green #%d	t = %d (Volume: %d%%) (Velocity: %d, Kiai: %d)\n", ++n, glp->t, glp->volume, glp->velocity, glp->kiai);
+			print("Green #%d	t = %d (Volume: %d%%) (Velocity: %d, Kiai: %d) (%s:%d)\n", ++n, glp->t, glp->volume, glp->velocity, glp->kiai, sets[glp->sampset], glp->sampindex);
 
 		print("\n");
 		n = 0;
 		
 		for (rline *rlp = bmp->rlines; rlp; rlp = rlp->next)
-			print("Red #%d	t = %d (Volume: %d%%) (Duration: %d, Meter: %d/4, Kiai: %d)\n", ++n, rlp->t, rlp->volume, rlp->duration, rlp->beats, rlp->kiai);
+			print("Red #%d	t = %d (Volume: %d%%) (Duration: %d, Meter: %d/4, Kiai: %d) (%s:%d)\n", ++n, rlp->t, rlp->volume, rlp->duration, rlp->beats, rlp->kiai, sets[rlp->sampset], rlp->sampindex);
 
 	}
 

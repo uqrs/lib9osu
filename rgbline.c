@@ -1,20 +1,17 @@
 #include <u.h>
 #include <libc.h>
+#include "aux.h"
 #include "rgbline.h"
 
 /* creates a new greenline */
 gline *
-mkgline(ulong t, double velocity, int volume, int kiai)
+mkgline(ulong t, double velocity)
 {
-	gline *new = malloc(sizeof(gline));
+	gline *new;
 
-	if(new == nil)
-		return nil;
-
+	new = ecalloc(1, sizeof(gline));
 	new->t = t;
 	new->velocity = velocity;
-	new->volume = volume;
-	new->kiai = kiai;
 	new->next = nil;
 
 	return new;
@@ -90,18 +87,14 @@ rmgline(gline *glistp, gline *glp)
 
 /* creates a new redline */
 rline *
-mkrline(ulong t, ulong duration, int beats, int volume, int kiai)
+mkrline(ulong t, ulong duration, int beats)
 {
-	rline *new = malloc(sizeof(rline));
+	rline *new;
 
-	if (new == nil)
-		return nil;
-
+	new = ecalloc(1, sizeof(rline));
 	new->t = t;
 	new->duration = duration;
 	new->beats = beats;
-	new->volume = volume;
-	new->kiai = kiai;
 	new->next = nil;
 
 	return new;

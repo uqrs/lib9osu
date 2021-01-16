@@ -5,6 +5,7 @@ typedef struct beatmap {
 	ulong leadin;		/* milliseconds before audio begins playing */
 	ulong previewt;	/* time in milliseconds when audio preview should start */
 	int countdown;		/* countdown timer speed */
+	int sampset;		/* default beatmap sample set.  see hitsound.h:/sampsets/ */
 	int stackleniency;	/* stack leniency */
 	int mode;			/* force gameplay mode */
 	int letterbox;		/* letterbox screen in breaks */
@@ -38,7 +39,7 @@ typedef struct beatmap {
 	int sltickrate;		/* slider tick rate */
 
 	/* [Events] */
-	char *events;		/* raw contents of the [Events] section sans carriage returns */
+	char *events;		/* raw contents of the [Events] section. */
 
 	/* [TimingPoints] */
 	rline *rlines;		/* head of redline list */

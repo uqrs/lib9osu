@@ -1,7 +1,9 @@
 #include <u.h>
 #include <libc.h>
+#include "aux.h"
 #include "hitobject.h"
 #include "rgbline.h"
+#include "hitsound.h"
 #include "beatmap.h"
 
 /* References: 
@@ -98,12 +100,12 @@ static entry entries[] = {
   * See: https://osu.ppy.sh/wiki/en/osu%21_File_Formats/Osu_%28file_format%29#hit-objects
   */
 enum {
-	OBJSAMPLE=-1,	/* hitsound sampleset (final field) */
+	OBJHITSAMP=-1,	/* custom hitsound sampleset (final field) */
 	OBJX=0,			/* x position of object */
 	OBJY,			/* y position of object */
 	OBJTIME,			/* timestamp in milliseconds */
 	OBJTYPE,			/* 8-bit integer describing object type & colours; see enum typebits */
-	OBJHITSOUND,		/* hitsound flags for object */
+	OBJADDITIONS,	/* hitsound additions for object */
 	OBJENDTIME=5,	/* spinner end timestamp */
 	OBJCURVES=5,		/* slider curve data */
 	OBJSLIDES,		/* amount of reverses + 1 */
@@ -112,9 +114,14 @@ enum {
 	OBJEDGESETS,		/* slider head/tail sample sets */
 };
 
-/* C(olon)SV and P(ipe)SV fields for OBJCURVES and OBJSAMPLE */
+/* C(olon)SV and P(ipe)SV fields for OBJCURVES and OBJSAMP */
 enum {
 	OBJCURVETYPE=0,
+	HITSAMPNORMAL=0,
+	HITSAMPADDITIONS,
+	HITSAMPINDEX,
+	HITSAMPVOLUME,
+	HITSAMPFILE,
 };
 
 /* bitmasks for the OBJTYPE field; apply with & */
@@ -133,8 +140,8 @@ enum {
 	LNDURATION=1,	/* duration of beat in miliseconds (redline only) */
 	LNVELOCITY=1,	/* negative inverse slider velocity multiplier (greenline only) */
 	LNBEATS,			/* number of beats in measure */
-	LNSAMPLESET,		/* default hitobject sampleset */
-	LNSAMPLEINDEX,	/* custom sample index */
+	LNSAMPSET,		/* default hitobject sampleset */
+	LNSAMPINDEX,		/* custom sample index */
 	LNVOLUME,		/* volume percentage */
 	LNREDLINE,		/* if 1, this is a redline */
 	LNEFFECTS,		/* extra effects */
@@ -151,6 +158,14 @@ enum {
 	RED=0,
 	GREEN,
 	BLUE,
+};
+
+/* Possible values for LNSAMPSET field. Indices correspond to hitsound.h:/sampsets/ */
+char *samplesets[] = {
+	"Default",		/* unused */
+	"Normal",
+	"Soft",
+	"Drum"
 };
 
 static int maxchar = 256;	/* size of line[] */
@@ -212,10 +227,7 @@ getline(int fd)
 	reset();
 	maxchar = 256;
 	nchar = 0;
-	line = malloc(sizeof(char) * maxchar);
-
-	if (line == nil)
-		return nil;
+	line = ecalloc(maxchar, sizeof(char));
 
 	while ((nread = read(fd, &c, 1)) != 0) {
 		if (c == '\n')
@@ -225,10 +237,7 @@ getline(int fd)
 
 		if (nchar+1 > maxchar) {
 			maxchar *= 2;
-			line = realloc(line, sizeof(char) * maxchar);
-
-			if (line == nil)
-				return nil;
+			line = erealloc(line, sizeof(char) * maxchar);
 		}
 
 		line[nchar++] = c;
@@ -314,17 +323,12 @@ csvsplit(char *sepchar)
 	nfield = 0;
 	maxfield = 9;
 
-	fields = malloc(sizeof(char *) * maxfield);
-	if (fields == nil)
-		return -1;
+	fields = ecalloc(maxfield, sizeof(char *));
 
 	do {
 		if (nfield+1 > maxfield) {
 			maxfield *= 2;
-			fields = realloc(fields, sizeof(char *) * maxfield);
-
-			if (fields == nil)
-				return -1;
+			fields = erealloc(fields, sizeof(char *) * maxfield);
 		}
 
 		if (p[0] == '"')
@@ -427,67 +431,6 @@ kvsplit()
 	return ep;
 }
 
-/* convert the string pointed to by s into runes, up to the NULL character.
-  * returns a pointer to a section of memory containing
-  * the converted string.
-  *
-  * returns nil when out of memory.
-  *
-  * returns a Rune string containing only Runeerror if the NULL character
-  * occurs in the middle of a UTF sequence. This  sets the error string,
-  * and the return value must still be free()d afterwards.
-  */
-static
-Rune *
-strrunedup(char *s)
-{
-	int nrune = 0;
-	int maxrune = 16;
-	int i, j;
-	Rune *out;
-
-	out = malloc(sizeof(Rune) * maxrune);
-
-	if (out == nil)
-		return nil;
-
-	for (i = 0; s[i] != '\0'; i++) {
-		if (nrune+1 > maxrune) {
-			maxrune *= 2;
-			out = realloc(out, sizeof(Rune) * maxrune);
-
-			if (out == nil)
-				return nil;
-		}
-
-		if ((uchar)s[i] < Runeself) {
-			out[nrune++] = (Rune)s[i];
-			continue;
-		}
-		char buf[UTFmax];
-		buf[0] = s[i++];
-
-		for (j = 1;;i++) {
-			if (s[i] == '\0') {
-				out[0] = Runeerror;
-				out[1] = '\0';
-				werrstr("unexpected end of string at position %d", i);
-
-				return out;
-			}
-			buf[j++] = s[i];
-			if (fullrune(buf, j)) {
-				chartorune(out+nrune, buf);
-				nrune++;
-				break;
-			}
-		}
-	}
-	out[nrune] = (Rune)'\0';
-
-	return out;
-}
-
 /* deserialises all [General] entries into the appropriate beatmap struct fields.
   * returns 0 on success, BADKEY on an illegal configuration key, or NOMEM
   * when out of memory. */
@@ -501,8 +444,6 @@ hsgeneral(beatmap *bmp, int fd)
 	}
 
 	bmp->audiof = strrunedup(getentry("AudioFilename")->value);
-	if (bmp->audiof == nil)
-		return NOMEM;
 
 	bmp->leadin = (ulong) atol(getentry("AudioLeadIn")->value);
 	bmp->previewt = (ulong) atol(getentry("PreviewTime")->value);
@@ -532,9 +473,7 @@ hseditor(beatmap *bmp, int fd)
 
 	setline(getentry("Bookmarks")->value);
 	if ((n = csvsplit(",")) != 0) {
-		bmp->bookmarks = malloc(sizeof(ulong) * n);
-		if (bmp->bookmarks == nil)
-			return NOMEM;
+		bmp->bookmarks = ecalloc(n, sizeof(ulong));
 
 		for (i = 0; i < n; i++)
 			bmp->bookmarks[i] = (ulong) atol(csvgetfield(i));
@@ -613,9 +552,7 @@ hsevents(beatmap *bmp, int fd)
 
 	nchar = 0;
 	maxchar = 256;
-	bmp->events = malloc(sizeof(char) * maxchar);
-	if (bmp->events == nil)
-		return NOMEM;
+	bmp->events = ecalloc(maxchar, sizeof(char));
 
 	while ((linep = nextentry(fd)) != nil) {
 		len = strlen(linep);
@@ -626,9 +563,7 @@ hsevents(beatmap *bmp, int fd)
 				maxchar *= 2;
 			} while (nchar + len + 2 > maxchar);
 
-			bmp->events = realloc(bmp->events, sizeof(char) * maxchar);
-			if (bmp->events == nil)
-				return NOMEM;
+			bmp->events = erealloc(bmp->events, sizeof(char) * maxchar);
 		}
 
 		strcat(bmp->events, linep);
@@ -650,16 +585,20 @@ hstimingpoints(beatmap *bmp, int fd)
 {
 	int isredline;
 	int t, beats, volume, effects, kiai;
+	int sampset, sampindex;
 	double velocity;
 	ulong duration;
-	void *lp;
+	gline *glp;
+	rline *rlp;
 
 	while (nextentry(fd) != nil) {
-		if (csvsplit(",") < 0)
-			return NOMEM;
+		csvsplit(",");
 
 		t = atol(csvgetfield(LNTIME));
+
 		volume = atoi(csvgetfield(LNVOLUME));
+		sampset = atoi(csvgetfield(LNSAMPSET));
+		sampindex = atoi(csvgetfield(LNSAMPINDEX));
 
 		effects = atoi(csvgetfield(LNEFFECTS));
 		kiai = effects & EBKIAI;
@@ -671,23 +610,29 @@ hstimingpoints(beatmap *bmp, int fd)
 			duration = atol(csvgetfield(LNDURATION));
 			beats = atol(csvgetfield(LNBEATS));
 
-			lp = (rline *)lp;
-			lp = mkrline(t, duration, beats, volume, kiai);
-			if (lp == nil)
-				return NOMEM;
+			rlp = mkrline(t, duration, beats);
 
-			bmp->rlines = addrlinet(bmp->rlines, lp);
+			rlp->volume = volume;
+			rlp->sampset = sampset;
+			rlp->sampindex = sampindex;
+
+			rlp->kiai = kiai;
+
+			bmp->rlines = addrlinet(bmp->rlines, rlp);
 
 			break;
 		case 0:
 			velocity = strtod(csvgetfield(LNVELOCITY), nil);
 
-			lp = (gline *)lp;
-			lp = mkgline(t, velocity, volume, kiai);
-			if (lp == nil)
-				return NOMEM;
+			glp = mkgline(t, velocity);
 
-			bmp->glines = addglinet(bmp->glines, lp);
+			glp->volume = volume;
+			glp->sampset = sampset;
+			glp->sampindex = sampindex;
+
+			glp->kiai = kiai;
+
+			bmp->glines = addglinet(bmp->glines, glp);
 
 			break;
 
@@ -728,17 +673,10 @@ hscolours(beatmap *bmp, int fd)
 		n++;
 	}
 
+	bmp->colours = ecalloc(n, sizeof(long));
 	bmp->ncolours = n;
-	bmp->colours = malloc(sizeof(long) * n);
-	if (bmp->colours == nil)
-		return NOMEM;
 
-	key = malloc(sizeof(char) * 7); /* Enough to store "Combo#" */
-	if (key == nil) {
-		free(bmp->colours);
-		bmp->colours = nil;
-		return NOMEM;
-	}
+	key = ecalloc(sizeof("Combo#"), sizeof(char));
 
 	for (i = 0; i < n; i++) {
 		sprint(key, "Combo%d", i + 1);
@@ -761,63 +699,82 @@ hscolours(beatmap *bmp, int fd)
 
 /* deserialises all [HitObjects] entries into hitobject objects, and adds
   * them to bmp's list.
-  * returns 0 on success, BADLINE on illegal line type, or NOMEM
-  * when out of memory. This routine sets the errstr. */
+  * returns 0 on success, or BADLINE on illegal line type.
+  * This routine sets the errstr. */
 static
 int
 hsobjects(beatmap *bmp, int fd)
 {
 	hitobject *op;
-	int t, x, y, type, typeb;
-	int n, i;
-	char *curvetype;
+
+	int t, x, y, typebits, type;
+
+	char *curves, *curvetype;
 	char *xs, *ys;
 
+	int additions;
+	char *hitsample;
+	char *edgesounds, *edgesets;
+	char *nsp, *asp;
+
+	int n, i;
+
 	while (nextentry(fd) != nil) {
-		if (csvsplit(",") < 0)
-			return NOMEM;
+		csvsplit(",");
 
 		t = (ulong) atol(csvgetfield(OBJTIME));
 		x = atoi(csvgetfield(OBJX));
 		y = atoi(csvgetfield(OBJY));
-		typeb = atoi(csvgetfield(OBJTYPE));
-		type = typeb & TBTYPE;
+		typebits = atoi(csvgetfield(OBJTYPE));
+		type = typebits & TBTYPE;
+
+		additions = atoi(csvgetfield(OBJADDITIONS));
+		hitsample = csvgetfield(OBJHITSAMP);
 
 		op = mkobj(type, t, x, y);
-		if (op == nil)
-			return NOMEM;
-
-		if (typeb & TBNEWCOMBO) {
-			op->newcombo = 1;
-			op->comboskip = (typeb & TBCOLOR) >> TBCOLORSHIFT;
-		}
 
 		switch (type) {
 		case TCIRCLE:
 			break;
 		case TSLIDER:
-			op->reverses = atoi(csvgetfield(OBJSLIDES)) - 1;
+			curves = csvgetfield(OBJCURVES);
+			edgesounds = csvgetfield(OBJEDGESOUNDS);
+			edgesets = csvgetfield(OBJEDGESETS);
+
+			op->slides = atoi(csvgetfield(OBJSLIDES));
 			op->length = strtod(csvgetfield(OBJLENGTH), nil);
 
-			/* hitsounding goes here .... */
-
-			setline(csvgetfield(OBJCURVES));
-			if ((n = csvsplit("|")) < 0)
-				return NOMEM;
-
+			setline(curves);
+			n = csvsplit("|");
 			curvetype = csvgetfield(OBJCURVETYPE);
-			if (curvetype == nil)
-				return BADCURVE;
-
 			op->curve = curvetype[0];
-
 			for (i = 1; i < n; i++) {
 				xs = csvgetfield(i);
 				ys = xs + strcspn(xs, ":");
 				ys[0] = '\0';
 				ys++;
-
 				op->alistp = addanchn(op->alistp, mkanch(atoi(xs), atoi(ys)), 0);
+			}
+
+			op->nsladdition = op->slides + 1;
+			op->sladditions = ecalloc(op->nsladdition, sizeof(int));
+			setline(edgesounds);
+			csvsplit("|");
+			for (i = 0; i < op->nsladdition; i++)
+				op->sladditions[i] = atoi(csvgetfield(i));
+
+			op->slnormalsets = ecalloc(op->nsladdition, sizeof(int));
+			op->sladditionsets = ecalloc(op->nsladdition, sizeof(int));
+			setline(edgesets);
+			csvsplit("|");
+			for (i = 0; i < op->nsladdition; i++) {
+				nsp = csvgetfield(i);
+				asp = nsp + strcspn(nsp, ":");
+				asp[0] = '\0';
+				asp++;
+
+				op->slnormalsets[i] = atoi(nsp);
+				op->sladditionsets[i] = atoi(asp);
 			}
 
 			break;
@@ -831,6 +788,20 @@ hsobjects(beatmap *bmp, int fd)
 			return BADOBJECT;
 		}
 
+		op->additions = additions;
+		setline(hitsample);
+		csvsplit(":");
+		op->normalset = atoi(csvgetfield(HITSAMPNORMAL));
+		op->additionset = atoi(csvgetfield(HITSAMPADDITIONS));
+		op->sampindex = atoi(csvgetfield(HITSAMPINDEX));
+		op->volume = atoi(csvgetfield(HITSAMPVOLUME));
+		op->filename = strrunedup(csvgetfield(HITSAMPFILE));
+
+		if (typebits & TBNEWCOMBO) {
+			op->newcombo = 1;
+			op->comboskip = (typebits & TBCOLOR) >> TBCOLORSHIFT;
+		}
+
 		bmp->objects = addobjt(bmp->objects, op);
 	}
 
@@ -841,39 +812,7 @@ hsobjects(beatmap *bmp, int fd)
 beatmap *
 mkbeatmap()
 {
-	beatmap *new = malloc(sizeof(beatmap));
-	if (new == nil)
-		return nil;
-
-	new->audiof = nil;
-	new->leadin = new->previewt = 0;
-	new->countdown = new->stackleniency = 0;
-	new->mode = new->letterbox = new->widescreensb = 0;
-
-	new->bookmarks = nil;
-	new->nbookmarks = 0;
-	new->distancesnap = new->beatdivisor = 0;
-	new->gridsize = 0;
-	new->timelinezoom = 0;
-
-	new->title = new->artist = new->author = nil;
-	new->diffname = new->source = new->tags = nil;
-	new->utf8title = new->utf8artist = nil;
-	new->id = new->setid = 0;
-
-	new->hp = new->cs = new->ar = new->od = 0;
-	new->slmultiplier = 0;
-	new->sltickrate = 0;
-
-	new->events = nil;
-
-	new->rlines = nil;
-	new->glines = nil;
-
-	new->colours = nil;
-	new->ncolours = 0;
-
-	new->objects= nil;
+	beatmap *new = ecalloc(1, sizeof(beatmap));
 
 	return new;
 }
@@ -934,9 +873,6 @@ loadmap(beatmap *bmp, int fd)
 	int i;
 	int exit;
 	int nhandler = sizeof(handlers) / sizeof(handler);
-
-	if (bmp == nil)
-		return NOMEM;
 
 	resetentries();
 

@@ -1,22 +1,21 @@
 #include <u.h>
 #include <libc.h>
+#include "aux.h"
 #include "hitobject.h"
 
 /* creates a new object */
 hitobject *
 mkobj(uchar type, ulong t, int x, int y)
 {
-	hitobject *new = malloc(sizeof(hitobject));
-	if (new == nil)
-		return nil;
+	hitobject *new;
+
+	new = ecalloc(1, sizeof(hitobject));
 
 	new->type = type;
 	new->t = t;
 	new->x = x;
 	new->y = y;
-
 	new->next = nil;
-	new->alistp = nil;
 
 	return new;
 }
@@ -30,6 +29,12 @@ nukeobj(hitobject *op)
 		next = ap->next;
 		free(ap);
 	}
+
+	free(op->sladditions);
+	free(op->slnormalsets);
+	free(op->sladditionsets);
+	free(op->filename);
+
 	free(op);
 }
 
@@ -102,7 +107,7 @@ lookupobjt(hitobject *listp, ulong t)
 {
 	hitobject *np;
 	if (listp == nil)
-		print("listp nil\n");
+		return nil;
 
 	for (np = listp; np->next != nil; np = np->next) {
 		if (np->next->t > t || np->t == t)
@@ -140,9 +145,7 @@ lookupobjn(hitobject *listp, uint n)
 anchor *
 mkanch(int x, int y)
 {
-	anchor *new = (anchor *) malloc(sizeof(anchor));
-	if (new == nil)
-		return nil;
+	anchor *new = (anchor *) ecalloc(1, sizeof(anchor));
 
 	new->x = x;
 	new->y = y;

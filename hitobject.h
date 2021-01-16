@@ -26,7 +26,19 @@ typedef struct hitobject {
 	ulong t;			/* timestamp in ms */
 	int x,y;			/* x and y positions in 'osu pixels' */
 	uchar type;		/* one of enum objtypes */
-	double length;		/* "visual length in osu! pixels." may be truncated with no consequences. */
+	double length;		/* "visual length in osu! pixels." may be truncated with "no consequences". */
+
+	int additions;		/* bit-flagged integer for additions. see hitsound.h:/additionbits/ */
+	int normalset;		/* sample set for the 'normal' sound */
+	int additionset;		/* sample set for whistle, finish and clap sounds */
+	int *sladditions;	/* additions for each slider edge hit */
+	int *slnormalsets;	/* sample sets for each slider edge hit */
+	int *sladditionsets;	/* sample sets for additions for each slider edge hit */
+	int nsladdition;		/* number of elements in sladditions(ets). Practically always slides+1 */
+
+	int sampindex;		/* custom sample index */
+	int volume;		/* sample volume percentage */
+	Rune *filename;	/* filename for custom addition sound */
 
 	int newcombo;		/* start new combo on this object */
 	int comboskip;		/* 'how many combo colours to skip' */
@@ -34,7 +46,7 @@ typedef struct hitobject {
 	hitobject *next;	/* next node in object list */ 
 
 	/* sliders */
-	int reverses;		/* the amount of times this slider will reverse. */
+	int slides;			/* the amount of times this slider reverses +1 */
 	char curve;		/* one of enum curvetypes */
 	anchor *alistp;		/* head of anchor list */
 
