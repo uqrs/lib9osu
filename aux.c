@@ -1,27 +1,5 @@
 #include <u.h>
 #include <libc.h>
-/* calloc. abort on error. */
-void *
-ecalloc(int n, int size)
-{
-	void *new;
-	new = calloc(n, size);
-	if (new == nil)
-		sysfatal("out of memory\n");
-	return new;
-}
-
-/* realloc. abort on error. */
-void *
-erealloc(void *p, int n)
-{
-	void *new;
-	new = realloc(p, n);
-	if (new == nil)
-		sysfatal("out of memory\n");
-	return new;		
-}
-
 /* convert the string pointed to by s into runes, up to the NULL character.
   * returns a pointer to a section of memory containing
   * the converted string.
@@ -40,12 +18,17 @@ strrunedup(char *s)
 	int i, j;
 	Rune *out;
 
-	out = ecalloc(maxrune, sizeof(Rune));
+	out = calloc(maxrune, sizeof(Rune));
+	if (out == nil)
+		return nil;
 
 	for (i = 0; s[i] != '\0'; i++) {
 		if (nrune+1 > maxrune) {
 			maxrune *= 2;
-			out = erealloc(out, sizeof(Rune) * maxrune);
+			out = realloc(out, sizeof(Rune) * maxrune);
+
+			if (out == nil)
+				return nil;
 		}
 
 		if ((uchar)s[i] < Runeself) {
@@ -75,3 +58,48 @@ strrunedup(char *s)
 
 	return out;
 }
+
+/* calloc. abort on error. */
+void *
+ecalloc(int n, int size)
+{
+	void *new;
+	new = calloc(n, size);
+	if (new == nil)
+		sysfatal("out of memory\n");
+	return new;
+}
+
+/* realloc. abort on error. */
+void *
+erealloc(void *p, int n)
+{
+	void *new;
+	new = realloc(p, n);
+	if (new == nil)
+		sysfatal("out of memory\n");
+	return new;
+}
+
+/* strdup. abort on error. */
+char *
+estrdup(char *s)
+{
+	char *new;
+	new = strdup(s);
+	if (new == nil)
+		sysfatal("out of memory\n");
+	return new;
+}
+
+/* strrunedup. abort on error */
+Rune *
+estrrunedup(char *s)
+{
+	Rune *new;
+	new = strrunedup(s);
+	if (new == nil)
+		sysfatal("out of memory\n");
+	return new;
+}
+

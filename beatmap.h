@@ -63,4 +63,4 @@ enum {
 
 beatmap *mkbeatmap();
 void nukebeatmap(beatmap *bmp);
-int loadmap(beatmap *bmp, int fd);
+int loadmap(beatmap *bmp, Biobuf *bp);

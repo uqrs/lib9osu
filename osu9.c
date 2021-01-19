@@ -1,5 +1,6 @@
 #include <u.h>
 #include <libc.h>
+#include <bio.h>
 #include <fcall.h>
 #include <thread.h>
 #include <9p.h>
@@ -60,22 +61,21 @@ gethsnames(int sbits)
 void
 main(int argc, char *argv[])
 {
-
-	int fd;
-	int n = 0;
+	Biobuf *bfile;
 
 	if (argc != 2) {
 		print("Usage: %s file\n", argv[0]);
 		exits("Too few arguments.");
 	}
 
-	fd = open(argv[1], OREAD);
-
-	if (fd == -1)
+	bfile = Bopen(argv[1], OREAD);
+	if (bfile == nil) {
 		print("You fucked up: %r\n");
+		exits("Bopen");
+	}
 
 	beatmap *bmp = mkbeatmap();
-	loadmap(bmp, fd);
+	loadmap(bmp, bfile);
 
 	if (bmp == nil)
 		print("%r\n");
@@ -83,6 +83,27 @@ main(int argc, char *argv[])
 		print("%s - %s [%s] by %s\n", bmp->artist, bmp->title, bmp->diffname, bmp->author);
 		print("%S - %S [%s] by %s\n", bmp->utf8artist, bmp->utf8title, bmp->diffname, bmp->author);
 		print("CS %f AR %f HP %f OD %f sv %f tick: %d\n", bmp->cs, bmp->ar, bmp->hp, bmp->od, bmp->slmultiplier, bmp->sltickrate);
+
+		print("\n");
+		for (int b = 0; b < bmp->nbookmarks; b++)
+			print("Bookmark #%d %d\n", b+1, bmp->bookmarks[b]);
+
+		print("\n");
+		print("%s", bmp->events);
+
+		print("\n");
+		for (int q = 0; q < bmp->ncolours; q++)
+			print("Combo%d = #%X\n", q+1, bmp->colours[q]);
+
+		int n = 0;
+		for (gline *glp = bmp->glines; glp; glp = glp->next)
+			print("Green #%d	t = %d (Volume: %d%%) (Velocity: %d, Kiai: %d) (%s:%d)\n", ++n, glp->t, glp->volume, glp->velocity, glp->kiai, sets[glp->sampset], glp->sampindex);
+
+		print("\n");
+		n = 0;
+
+		for (rline *rlp = bmp->rlines; rlp; rlp = rlp->next)
+			print("Red #%d	t = %d (Volume: %d%%) (Duration: %d, Meter: %d/4, Kiai: %d) (%s:%d)\n", ++n, rlp->t, rlp->volume, rlp->duration, rlp->beats, rlp->kiai, sets[rlp->sampset], rlp->sampindex);
 
 		for (hitobject *np = bmp->objects; np; np = np->next) {
 			print("%s", types[np->type-1]);
@@ -118,35 +139,7 @@ main(int argc, char *argv[])
 				print("(%s:%s)\n", sets[np->normalset], sets[np->additionset]);
 			}
 		}
-
-		print("\n\n");
-		n = 0;
-
-		for (gline *glp = bmp->glines; glp; glp = glp->next)
-			print("Green #%d	t = %d (Volume: %d%%) (Velocity: %d, Kiai: %d) (%s:%d)\n", ++n, glp->t, glp->volume, glp->velocity, glp->kiai, sets[glp->sampset], glp->sampindex);
-
-		print("\n");
-		n = 0;
-		
-		for (rline *rlp = bmp->rlines; rlp; rlp = rlp->next)
-			print("Red #%d	t = %d (Volume: %d%%) (Duration: %d, Meter: %d/4, Kiai: %d) (%s:%d)\n", ++n, rlp->t, rlp->volume, rlp->duration, rlp->beats, rlp->kiai, sets[rlp->sampset], rlp->sampindex);
-
 	}
-
-	print("\n");
-	for (int q = 0; q < bmp->ncolours; q++)
-		print("Combo%d = #%X\n", q+1, bmp->colours[q]);
-
-	print("\n");
-	for (int b = 0; b < bmp->nbookmarks; b++)
-		print("Bookmark #%d %d\n", b+1, bmp->bookmarks[b]);
-
-	print("\n");
-	print("%f %f %d %f\n", bmp->distancesnap, bmp->beatdivisor, bmp->gridsize, bmp->timelinezoom);
-
-	print("\n");
-	print("%d\n", strlen(bmp->events)+1);
-	print("%s", bmp->events);
 
 	nukebeatmap(bmp);
 
