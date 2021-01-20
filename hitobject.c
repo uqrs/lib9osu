@@ -25,7 +25,7 @@ void
 nukeobj(hitobject *op)
 {
 	anchor *ap, *next;
-	for (ap = op->alistp; ap != nil; ap = next) {
+	for (ap = op->anchors; ap != nil; ap = next) {
 		next = ap->next;
 		free(ap);
 	}

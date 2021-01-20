@@ -87,7 +87,7 @@ rmgline(gline *glistp, gline *glp)
 
 /* creates a new redline */
 rline *
-mkrline(ulong t, ulong duration, int beats)
+mkrline(ulong t, double duration, int beats)
 {
 	rline *new;
 

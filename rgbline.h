@@ -2,7 +2,7 @@
 typedef struct rline rline;
 typedef struct rline {
 	ulong t;				/* timestamp in ms */
-	ulong duration;			/* beat duration in ms */
+	double duration;		/* beat duration in ms */
 	int beats;				/* time signature in beats/4 */
 	int kiai;				/* kiai time enabled yes/no */
 
@@ -16,7 +16,8 @@ typedef struct rline {
 typedef struct gline gline;
 typedef struct gline {
 	ulong t;				/* timestamp in ms */
-	int velocity;			/* ? */
+	double velocity;		/* ? */
+	int beats;				/* ignored for greenlines */
 	int kiai;				/* kiai time enabled yes/no */
 
 	int sampset;			/* sample set */
@@ -31,7 +32,7 @@ void nukegline(gline *gline);
 gline *addglinet(gline *glistp, gline *glp);
 gline *moveglinet(gline *glistp, gline *glp, ulong t);
 gline *rmgline(gline *glistp, gline *glp);
-rline *mkrline(ulong t, ulong duration, int beats);
+rline *mkrline(ulong t, double duration, int beats);
 void nukerline(rline *rline);
 rline *addrlinet(rline *rlistp, rline *rlp);
 rline *moverlinet(rline *rlistp, rline *rlt, ulong t);

@@ -5,15 +5,15 @@ typedef struct beatmap {
 	ulong leadin;		/* milliseconds before audio begins playing */
 	ulong previewt;	/* time in milliseconds when audio preview should start */
 	int countdown;		/* countdown timer speed */
-	int sampset;		/* default beatmap sample set.  see hitsound.h:/sampsets/ */
-	int stackleniency;	/* stack leniency */
+	char *sampset;		/* default beatmap sample set. */
+	float stackleniency;	/* stack leniency */
 	int mode;			/* force gameplay mode */
 	int letterbox;		/* letterbox screen in breaks */
 	int widescreensb;	/* widescreen storyboard */
 
 	/* [Editor] */
 	ulong *bookmarks;	/* bookmark list */
-	int nbookmarks;	/* number of bookmarks in *bookmarks */
+	int nbookmark;		/* number of bookmarks in *bookmarks */
 	float distancesnap;	/* distance snap multiplier */
 	float beatdivisor;	/* beat snap divisor */
 	int gridsize;		/* grid size */
@@ -35,7 +35,7 @@ typedef struct beatmap {
 	float cs;			/* circle size */
 	float ar;			/* approach rate */
 	float od;			/* overall difficulty */
-	float slmultiplier;	/* slider velocity multiplier */
+	double slmultiplier;	/* slider velocity multiplier */
 	int sltickrate;		/* slider tick rate */
 
 	/* [Events] */
@@ -47,7 +47,7 @@ typedef struct beatmap {
 
 	/* [Colours] */
 	long *colours;		/* combo colour hex codes. nil for default colours */
-	int ncolours;		/* number of colours in *colours */
+	int ncolour;		/* number of colours in *colours */
 
 	/* [HitObjects] */
 	hitobject *objects;	/* head of object list */
@@ -64,3 +64,4 @@ enum {
 beatmap *mkbeatmap();
 void nukebeatmap(beatmap *bmp);
 int loadmap(beatmap *bmp, Biobuf *bp);
+int writemap(beatmap *bmp, Biobuf *bp);

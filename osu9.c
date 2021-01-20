@@ -61,7 +61,7 @@ gethsnames(int sbits)
 void
 main(int argc, char *argv[])
 {
-	Biobuf *bfile;
+	Biobuf *bfile, *bout;
 
 	if (argc != 2) {
 		print("Usage: %s file\n", argv[0]);
@@ -76,6 +76,7 @@ main(int argc, char *argv[])
 
 	beatmap *bmp = mkbeatmap();
 	loadmap(bmp, bfile);
+	Bterm(bfile);
 
 	if (bmp == nil)
 		print("%r\n");
@@ -85,25 +86,25 @@ main(int argc, char *argv[])
 		print("CS %f AR %f HP %f OD %f sv %f tick: %d\n", bmp->cs, bmp->ar, bmp->hp, bmp->od, bmp->slmultiplier, bmp->sltickrate);
 
 		print("\n");
-		for (int b = 0; b < bmp->nbookmarks; b++)
+		for (int b = 0; b < bmp->nbookmark; b++)
 			print("Bookmark #%d %d\n", b+1, bmp->bookmarks[b]);
 
 		print("\n");
 		print("%s", bmp->events);
 
 		print("\n");
-		for (int q = 0; q < bmp->ncolours; q++)
+		for (int q = 0; q < bmp->ncolour; q++)
 			print("Combo%d = #%X\n", q+1, bmp->colours[q]);
 
 		int n = 0;
 		for (gline *glp = bmp->glines; glp; glp = glp->next)
-			print("Green #%d	t = %d (Volume: %d%%) (Velocity: %d, Kiai: %d) (%s:%d)\n", ++n, glp->t, glp->volume, glp->velocity, glp->kiai, sets[glp->sampset], glp->sampindex);
+			print("Green #%d	t = %d (Volume: %d%%) (Velocity: %.16g, Kiai: %d) (%s:%d)\n", ++n, glp->t, glp->volume, glp->velocity, glp->kiai, sets[glp->sampset], glp->sampindex);
 
 		print("\n");
 		n = 0;
 
 		for (rline *rlp = bmp->rlines; rlp; rlp = rlp->next)
-			print("Red #%d	t = %d (Volume: %d%%) (Duration: %d, Meter: %d/4, Kiai: %d) (%s:%d)\n", ++n, rlp->t, rlp->volume, rlp->duration, rlp->beats, rlp->kiai, sets[rlp->sampset], rlp->sampindex);
+			print("Red #%d	t = %d (Volume: %d%%) (Duration: %.16g, Meter: %d/4, Kiai: %d) (%s:%d)\n", ++n, rlp->t, rlp->volume, rlp->duration, rlp->beats, rlp->kiai, sets[rlp->sampset], rlp->sampindex);
 
 		for (hitobject *np = bmp->objects; np; np = np->next) {
 			print("%s", types[np->type-1]);
@@ -115,23 +116,27 @@ main(int argc, char *argv[])
 
 			if (np->type == TSLIDER) {
 				print("(Type: '%c' Points:", np->curve);
-				for (anchor *ap = np->alistp; ap != nil; ap = ap->next)
+				for (anchor *ap = np->anchors; ap != nil; ap = ap->next)
 					print(" %d,%d", ap->x, ap->y);
 
-				print(") (");
+				print(")");
 
-				print("%s", gethsnames(np->sladditions[0]));
-				for (int y = 1; y < np->nsladdition; y++)
-					print(" // %s", gethsnames(np->sladditions[y]));
+				if (np->nsladdition > 0) {
+					print(" (");
+					print("%s", gethsnames(np->sladditions[0]));
+					for (int y = 1; y < np->nsladdition; y++)
+						print(" // %s", gethsnames(np->sladditions[y]));
+	
+					print(") (");
+	
+					print("%s:%s", sets[np->slnormalsets[0]], sets[np->sladditionsets[0]]);
+					for (int y = 1; y < np->nsladdition; y++)
+						print(" // %s:%s", sets[np->slnormalsets[y]], sets[np->sladditionsets[y]]);
+	
+					print(")");
+				}
 
-				print(") (");
-
-				print("%s:%s", sets[np->slnormalsets[0]], sets[np->sladditionsets[0]]);
-				for (int y = 1; y < np->nsladdition; y++)
-					print(" // %s:%s", sets[np->slnormalsets[y]], sets[np->sladditionsets[y]]);
-
-				print(")\n");
-
+				print("\n");
 			} else if (np->type == TSPINNER) {
 				print("(Duration: %dms)\n", np->spinnerlength);
 			} else {
@@ -140,6 +145,10 @@ main(int argc, char *argv[])
 			}
 		}
 	}
+
+	bout = Bopen("/home/mvk/osufs/outp.osu", OWRITE);
+	writemap(bmp, bout);
+	Bterm(bout);
 
 	nukebeatmap(bmp);
 

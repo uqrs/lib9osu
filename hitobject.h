@@ -48,7 +48,7 @@ typedef struct hitobject {
 	/* sliders */
 	int slides;			/* the amount of times this slider reverses +1 */
 	char curve;		/* one of enum curvetypes */
-	anchor *alistp;		/* head of anchor list */
+	anchor *anchors;	/* head of anchor list */
 
 	/* spinners */
 	ulong spinnerlength;  /* spinner duration in ms */
