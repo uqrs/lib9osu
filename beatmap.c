@@ -417,7 +417,7 @@ readentries(table *tp, Biobuf *bp, typespec *speclist, int nspec)
 
 		specp = lookupspec(speclist, nspec, sp->fields[KEY]);
 		if (specp == nil) {
-			werrstr("Unknown configuration key '%s'\n", sp->fields[KEY]);
+			werrstr("Unknown configuration key '%s'", sp->fields[KEY]);
 			free(line);
 			nukesplitline(sp);
 
@@ -739,7 +739,7 @@ rtimingpoints(beatmap *bmp, Biobuf *bp)
 	return 0;
 
 badline:
-	werrstr("malformed line: %s\n", line);
+	werrstr("malformed line: %s", line);
 	nukesplitline(sp);
 	free(line);
 	return BADLINE;
