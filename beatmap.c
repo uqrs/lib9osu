@@ -531,17 +531,18 @@ reditor(beatmap *bmp, Biobuf *bp)
 	if (exit < 0)
 		return exit;
 
-	ep = lookup(bmp->editor, "Bookmarks");
-	sp = csvsplit(ep->s, ",");
-	if (sp->nfield > 0) {
-		bmp->bookmarks = ecalloc(sp->nfield, sizeof(long));
-		for (i = 0; i < sp->nfield; i++)
-			bmp->bookmarks[i] = atol(sp->fields[i]);
+	if ((ep = lookup(bmp->editor, "Bookmarks")) != nil) {
+		sp = csvsplit(ep->s, ",");
+		if (sp->nfield > 0) {
+			bmp->bookmarks = ecalloc(sp->nfield, sizeof(long));
+			for (i = 0; i < sp->nfield; i++)
+				bmp->bookmarks[i] = atol(sp->fields[i]);
 
-		bmp->nbookmark = sp->nfield;
+			bmp->nbookmark = sp->nfield;
+		}
+		nukesplitline(sp);
+		nukeentry(rmentry(bmp->editor, ep));
 	}
-	nukesplitline(sp);
-	nukeentry(rmentry(bmp->editor, ep));
 
 	return 0;
 }
