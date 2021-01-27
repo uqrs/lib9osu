@@ -4,11 +4,42 @@
 #include <fcall.h>
 #include <thread.h>
 #include <9p.h>
+#include "aux.h"
+#include "hash.h"
 #include "rgbline.h"
+#include "hitsound.h"
 #include "hitobject.h"
 #include "beatmap.h"
-#include "hitsound.h"
 
+void
+main(int argc, char *argv[])
+{
+	Biobuf *bfile, *boutfile;
+
+	bfile = Bopen(argv[1], OREAD);
+	if (bfile == nil) {
+		print("You fucked up: %r\n");
+		exits("Bopen");
+	}
+	beatmap *bmp = mkbeatmap();
+	if (readmap(bmp, bfile) < 0) {
+		Bterm(bfile);
+		print("%r\n");
+		exits("Fuck.");
+	}
+	Bterm(bfile);
+
+	boutfile = ecalloc(1, sizeof(Biobuf));
+	Binit(boutfile, 1, OWRITE);
+	writemap(bmp, boutfile);
+
+	Bterm(boutfile);
+	nukebeatmap(bmp);
+
+	exits(0);
+}
+
+/* old. use as reference only
 char *types[] = {
 	"Circle",
 	"Slider",
@@ -62,6 +93,9 @@ void
 main(int argc, char *argv[])
 {
 	Biobuf *bfile, *bout;
+	int pfm;
+
+	pfm = 0;
 
 	if (argc != 2) {
 		print("Usage: %s file\n", argv[0]);
@@ -80,7 +114,8 @@ main(int argc, char *argv[])
 
 	if (bmp == nil)
 		print("%r\n");
-	else {
+	else if (pfm == 1) {
+		print("%s\n", bmp->version);
 		print("%s - %s [%s] by %s\n", bmp->artist, bmp->title, bmp->diffname, bmp->author);
 		print("%S - %S [%s] by %s\n", bmp->utf8artist, bmp->utf8title, bmp->diffname, bmp->author);
 		print("CS %f AR %f HP %f OD %f sv %f tick: %d\n", bmp->cs, bmp->ar, bmp->hp, bmp->od, bmp->slmultiplier, bmp->sltickrate);
@@ -154,3 +189,4 @@ main(int argc, char *argv[])
 
 	exits(0);
 }
+*/

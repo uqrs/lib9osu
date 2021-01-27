@@ -8,8 +8,7 @@
   *
   * returns a Rune string containing only Runeerror if the NULL character
   * occurs in the middle of a UTF sequence. This  sets the error string,
-  * and the return value must still be free()d afterwards.
-  */
+  * and the return value must still be free()d afterwards. */
 Rune *
 strrunedup(char *s)
 {
@@ -17,6 +16,9 @@ strrunedup(char *s)
 	int maxrune = 16;
 	int i, j;
 	Rune *out;
+
+	if (s == nil)
+		return nil;
 
 	out = calloc(maxrune, sizeof(Rune));
 	if (out == nil)
@@ -59,40 +61,6 @@ strrunedup(char *s)
 	return out;
 }
 
-/* calloc. abort on error. */
-void *
-ecalloc(int n, int size)
-{
-	void *new;
-	new = calloc(n, size);
-	if (new == nil)
-		sysfatal("out of memory\n");
-	return new;
-}
-
-/* realloc. abort on error. */
-void *
-erealloc(void *p, int n)
-{
-	void *new;
-	new = realloc(p, n);
-	if (new == nil)
-		sysfatal("out of memory\n");
-	return new;
-}
-
-/* strdup. abort on error. */
-char *
-estrdup(char *s)
-{
-	char *new;
-	new = strdup(s);
-	if (new == nil)
-		sysfatal("out of memory\n");
-	return new;
-}
-
-/* strrunedup. abort on error */
 Rune *
 estrrunedup(char *s)
 {
@@ -103,3 +71,59 @@ estrrunedup(char *s)
 	return new;
 }
 
+void *
+ecalloc(int n, int size)
+{
+	void *new;
+	new = calloc(n, size);
+	if (new == nil)
+		sysfatal("out of memory\n");
+	return new;
+}
+
+void *
+erealloc(void *p, int n)
+{
+	void *new;
+	new = realloc(p, n);
+	if (new == nil)
+		sysfatal("out of memory\n");
+	return new;
+}
+
+char *
+estrdup(char *s)
+{
+	char *new;
+	new = strdup(s);
+	if (new == nil)
+		sysfatal("out of memory\n");
+	return new;
+}
+
+float
+sfatof(char *s)
+{
+	if (s == nil)
+		return 0;
+
+	return atof(s);
+}
+
+int
+sfatoi(char *s)
+{
+	if (s == nil)
+		return 0;
+
+	return atof(s);
+}
+
+double
+sfatod(char *s)
+{
+	if (s == nil)
+		return 0;
+
+	return strtod(s, nil);
+}

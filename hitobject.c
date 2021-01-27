@@ -1,11 +1,12 @@
 #include <u.h>
 #include <libc.h>
 #include "aux.h"
+#include "hitsound.h"
 #include "hitobject.h"
 
 /* creates a new object */
 hitobject *
-mkobj(uchar type, ulong t, int x, int y)
+mkobj(uchar type, long t, int x, int y)
 {
 	hitobject *new;
 
@@ -33,7 +34,7 @@ nukeobj(hitobject *op)
 	free(op->sladditions);
 	free(op->slnormalsets);
 	free(op->sladditionsets);
-	free(op->filename);
+	nukehitsample(op->samp);
 
 	free(op);
 }
@@ -67,7 +68,7 @@ addobjt(hitobject *listp, hitobject *op)
 
 /* changes hitobject op's time to t, and adjust its position in listp */
 hitobject *
-moveobjt(hitobject *listp, hitobject *op, ulong t)
+moveobjt(hitobject *listp, hitobject *op, long t)
 {
 	listp = rmobj(listp, op);
 	op->t = t;
@@ -103,7 +104,7 @@ rmobj(hitobject *listp, hitobject *op)
   * If no object in listp  has time t, lookupobjt returns the
   * latest hitobject  whose timestamp comes before t in listp. */
 hitobject *
-lookupobjt(hitobject *listp, ulong t)
+lookupobjt(hitobject *listp, long t)
 {
 	hitobject *np;
 	if (listp == nil)
