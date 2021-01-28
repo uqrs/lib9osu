@@ -5,11 +5,11 @@
 
 /* create a new line */
 rgline *
-mkrgline(long t, double vord, int beats, int type)
+mkrgline(double t, double vord, int beats, int type)
 {
 	rgline *new;
 
-	if (type < GLINE || type > RLINE || beats < 0)
+	if (type < GLINE || type > RLINE)
 		return nil;
 
 	new = ecalloc(1, sizeof(rgline));
@@ -34,7 +34,7 @@ nukergline(rgline *lp)
 	free(lp);
 }
 
-/* inserts a line into llistp based on its time value.
+/* inserts a line into listp based on its time value.
   * in the case of timestamp "conflicts", addrgbline
   * ensures green lines will not precede redlines in
   * the list's order,
@@ -42,86 +42,72 @@ nukergline(rgline *lp)
   * returns a pointer to the list's head
   * returns nil if lp is nil, or lp->type is invalid */
 rgline *
-addrglinet(rgline *llistp, rgline *lp)
+addrglinet(rgline *listp, rgline *lp)
 {
 	rgline *np;
 
 	if (lp == nil || lp->type < GLINE || lp->type > RLINE)
 		return nil;
-	if (llistp == nil)
+	if (listp == nil)
 		return lp;
 
-	if (lp->type == GLINE) {
-		if (lp->t < llistp->t) {
-			lp->next = llistp;
-			return lp;
-		}
+	if (lp->t < listp->t || (lp->type == RLINE && lp->t <= listp->t)) {
+		lp->next = listp;
+		return lp;
+	}
 
-		for (np = llistp; np != nil; np = np->next) {
-			if (lp->t == np->t) {
+	for (np = listp; np != nil; np = np->next) {
+		if (lp->t == np->t) {
+			if (lp->type == GLINE)
 				for (; np->next != nil && np->next->t == lp->t; np = np->next)
 					;
-				lp->next = np->next;
-				np->next = lp;
-				return llistp;
-			} else if (np->next == nil) {
-				np->next = lp;
-				return llistp;
-			} else if (lp->t > np->t && lp->t < np->next->t) {
-				lp->next = np->next;
-				np->next = lp;
-				return llistp;
-			}
-		}
-	} else if (lp->type == RLINE) {
-		if (lp->t <= llistp->t) {
-			lp->next = llistp;
-			return lp;
-		}
-
-		for (np = llistp; np != nil; np = np->next) {
-			if (np->next == nil) {
-				np->next = lp;
-				return llistp;
-			} else if (lp->t > np->t && lp->t <= np->next->t) {
-				lp->next = np->next;
-				np->next = lp;
-				return llistp;
-			}
+			else if (lp->type == RLINE)
+				for (; np->next != nil && np->next->t == lp->t && np->next->type == RLINE; np = np->next)
+					;
+			lp->next = np->next;
+			np->next = lp;
+			return listp;
+		} else if (np->next == nil) {
+			np->next = lp;
+			return listp;
+		} else if (lp->t > np->t && lp->t < np->next->t) {
+			lp->next = np->next;
+			np->next = lp;
+			return listp;
 		}
 	}
 
 	return nil; /* unreachable */
 }
 
-/* change line lp's time to t and adjust its position in llistp */
+/* change line lp's time to t and adjust its position in listp */
 rgline *
-movergline(rgline *llistp, rgline *lp, long t)
+movergline(rgline *listp, rgline *lp, double t)
 {
-	llistp = rmrgline(llistp, lp);
+	listp = rmrgline(listp, lp);
 	lp->t = t;
-	return addrglinet(llistp, lp);
+	return addrglinet(listp, lp);
 }
 
-/* remove the line pointed to by lp from llistp */
+/* remove the line pointed to by lp from listp */
 rgline *
-rmrgline(rgline *llistp, rgline *lp)
+rmrgline(rgline *listp, rgline *lp)
 {
 	rgline *np, *newlistp;
 
-	if (llistp == nil) {
+	if (listp == nil) {
 		return nil;
-	} else if (llistp == lp) {
-		newlistp = llistp->next;
-		llistp->next = nil;
+	} else if (listp == lp) {
+		newlistp = listp->next;
+		listp->next = nil;
 		return newlistp;
 	}
 
-	for (np = llistp; np->next != nil; np = np->next) {
+	for (np = listp; np->next != nil; np = np->next) {
 		if (np->next == lp) {
 			np->next = lp->next;
 			lp->next = nil;
-			return llistp;
+			return listp;
 		}
 	}
 

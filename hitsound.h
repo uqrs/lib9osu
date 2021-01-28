@@ -17,9 +17,9 @@ typedef struct hitsample hitsample;
 typedef struct hitsample {
 	int normal;		/* sample set for the 'normal' sound */
 	int addition;		/* sample set for whistle, finish and clap sounds */
-	int index;			/* custom sample index */
-	int volume;		/* sample volume percentage */
-	Rune *file;			/* filename for custom addition sound; may be nil */
+	int index;			/* custom sample index; negative values indicate that no index was selected */
+	int volume;		/* sample volume percentage; negative values indicate that no volume was set */
+	Rune *file;			/* filename for custom addition sound; nil value indicates that hitsample definition had no 'file' field. */
 } hitsample;
 
 hitsample *mkhitsample(int normal, int addition, int index, int volume, Rune *file);

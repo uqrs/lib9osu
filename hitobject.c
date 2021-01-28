@@ -6,7 +6,7 @@
 
 /* creates a new object */
 hitobject *
-mkobj(uchar type, long t, int x, int y)
+mkobj(uchar type, double t, int x, int y)
 {
 	hitobject *new;
 
@@ -54,21 +54,29 @@ addobjt(hitobject *listp, hitobject *op)
 		return op;
 	}
 
-	for (np = listp; np->next != nil; np = np->next) {
-		if (op->t > np->t && op->t <= np->next->t) {
+	for (np = listp; np != nil; np = np->next) {
+		if (op->t == np->t) {
+			for (; np->next != nil && np->next->t == op->t; np = np->next)
+				;
+			op->next = np->next;
+			np->next = op;
+			return listp;
+		} else if (np->next == nil) {
+			np->next = op;
+			return listp;
+		} else if (op->t > np->t && op->t < np->next->t) {
 			op->next = np->next;
 			np->next = op;
 			return listp;
 		}
 	}
 
-	np->next = op;
-	return listp;
+	return nil; /* unreachable */
 }
 
 /* changes hitobject op's time to t, and adjust its position in listp */
 hitobject *
-moveobjt(hitobject *listp, hitobject *op, long t)
+moveobjt(hitobject *listp, hitobject *op, double t)
 {
 	listp = rmobj(listp, op);
 	op->t = t;
@@ -104,7 +112,7 @@ rmobj(hitobject *listp, hitobject *op)
   * If no object in listp  has time t, lookupobjt returns the
   * latest hitobject  whose timestamp comes before t in listp. */
 hitobject *
-lookupobjt(hitobject *listp, long t)
+lookupobjt(hitobject *listp, double t)
 {
 	hitobject *np;
 	if (listp == nil)

@@ -10,8 +10,6 @@ mkhitsample(int normal, int addition, int index, int volume, Rune *file)
 
 	if (normal < SAMPDEFAULT || normal > SAMPDRUM || addition < SAMPDEFAULT || addition > SAMPDRUM)
 		return nil;
-	if (index < 0 || volume < 0)
-		return nil;
 
 	new = ecalloc(1, sizeof(hitsample));
 

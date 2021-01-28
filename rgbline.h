@@ -8,7 +8,7 @@ typedef struct rgline rgline;
 typedef struct rgline {
 	rgline *next;	/* next rgline in list */
 
-	long t;		/* timestamp in ms */
+	double t;		/* timestamp in ms */
 
 	int type;		/* one of enum linetype */
 	union {
@@ -18,6 +18,7 @@ typedef struct rgline {
 
 	int beats;		/* time signature in beats/4 */
 	int kiai;		/* kiai time enabled yes/no */
+	int omitbl;		/* omit first barline in osu!mania and taiko yes/no */
 
 	int sampset;	/* sample set */
 	int sampindex;	/* custom sample index; 0 for default */
@@ -25,8 +26,8 @@ typedef struct rgline {
 
 } line;
 
-line *mkrgline(long t, double vord, int beats, int type);
+line *mkrgline(double t, double vord, int beats, int type);
 void nukergline(rgline *lp);
-line *addrglinet(rgline *llistp, rgline *lp);
-line *moverglinet(rgline *llistp, rgline *lp, long t);
-line *rmrgline(rgline *llistp, rgline *lp);
+line *addrglinet(rgline *listp, rgline *lp);
+line *moverglinet(rgline *listp, rgline *lp, double t);
+line *rmrgline(rgline *listp, rgline *lp);

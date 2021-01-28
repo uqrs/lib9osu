@@ -23,7 +23,7 @@ static int rdifficulty(beatmap *bmp, Biobuf *bp);
 static int revents(beatmap *bmp, Biobuf *bp);
 static int rtimingpoints(beatmap *bmp, Biobuf *bp);
 static int rcolours(beatmap *bmp, Biobuf *bp);
-static int robjects(beatmap *bmp, Biobuf *bp);
+static int rhitobjects(beatmap *bmp, Biobuf *bp);
 
 static int wgeneral(beatmap *bmp, Biobuf *bp);
 static int weditor(beatmap *bmp, Biobuf *bp);
@@ -32,7 +32,7 @@ static int wdifficulty(beatmap *bmp, Biobuf *bp);
 static int wevents(beatmap *bmp, Biobuf *bp);
 static int wtimingpoints(beatmap *bmp, Biobuf *bp);
 static int wcolours(beatmap *bmp, Biobuf *bp);
-static int wobjects(beatmap *bmp, Biobuf *bp);
+static int whitobjects(beatmap *bmp, Biobuf *bp);
 
 typedef struct typespec {
 	char *key;		/* string key of entry */
@@ -54,67 +54,78 @@ static handler handlers[] = {
 	{.section = "[Events]", .read = revents, .write = wevents},
 	{.section = "[TimingPoints]", .read = rtimingpoints, .write = wtimingpoints},
 	{.section = "[Colours]", .read = rcolours, .write = wcolours},
-	{.section = "[HitObjects]", .read = robjects, .write = wobjects},
+	{.section = "[HitObjects]", .read = rhitobjects, .write = whitobjects},
 };
 
 static typespec fgeneral[] = {
 	/* [General] */
-	{.key = "AudioFilename", .fmt = "%S", .type = TRUNE},
-	{.key = "AudioLeadIn", .fmt = "%ld", .type = TLONG},
-	{.key = "PreviewTime", .fmt = "%ld", .type = TLONG},
-	{.key = "Countdown", .fmt = "%d", .type = TINT},
-	{.key = "SampleSet", .fmt = "%s", .type = TSTRING},
-	{.key = "StackLeniency", .fmt = "%g", .type = TFLOAT},
-	{.key = "Mode", .fmt = "%d", .type = TINT},
-	{.key = "LetterboxInBreaks", .fmt = "%d", .type = TINT},
-	{.key = "WidescreenStoryboard", .fmt = "%d", .type = TINT},
+	{.key = "AudioFilename", .fmt = "%s: %S", .type = TRUNE},
+	{.key = "AudioLeadIn", .fmt = "%s: %ld", .type = TLONG},
+	{.key = "PreviewTime", .fmt = "%s: %ld", .type = TLONG},
+	{.key = "Countdown", .fmt = "%s: %d", .type = TINT},
+	{.key = "SampleSet", .fmt = "%s: %s", .type = TSTRING},
+	{.key = "StackLeniency", .fmt = "%s: %G", .type = TFLOAT},
+	{.key = "Mode", .fmt = "%s: %d", .type = TINT},
+	{.key = "LetterboxInBreaks", .fmt = "%s: %d", .type = TINT},
+	{.key = "StoryFireInFront", .fmt = "%s: %d", .type = TINT},
+	{.key = "UseSkinSprites", .fmt = "%s: %d", .type = TINT},
+	{.key = "OverlayPosition", .fmt = "%s: %s", .type = TSTRING},
+	{.key = "SkinPreference", .fmt = "%s:%s", .type = TSTRING},
+	{.key = "EpilepsyWarning", .fmt = "%s: %d", .type = TINT},
+	{.key = "CountdownOffset", .fmt = "%s: %d", .type = TINT},
+	{.key = "WidescreenStoryboard", .fmt = "%s: %d", .type = TINT},
+	{.key = "SamplesMatchPlaybackRate", .fmt = "%s: %d", .type = TINT},
 };
 
 static typespec feditor[] = {
 	/* [Editor] */
-	{.key = "Bookmarks", .fmt = "%s", .type = TSTRING},
-	{.key = "DistanceSpacing", .fmt = "%g", .type = TFLOAT},
-	{.key = "BeatDivisor", .fmt = "%g", .type = TFLOAT},
-	{.key = "GridSize", .fmt = "%d", .type = TINT},
-	{.key = "TimelineZoom", .fmt = "%.7g", .type = TFLOAT},
+	{.key = "Bookmarks", .fmt = "%s: %s", .type = TSTRING},
+	{.key = "DistanceSpacing", .fmt = "%s: %.16G", .type = TDOUBLE},
+	{.key = "BeatDivisor", .fmt = "%s: %G", .type = TFLOAT},
+	{.key = "GridSize", .fmt = "%s: %d", .type = TINT},
+	{.key = "TimelineZoom", .fmt = "%s: %.7G", .type = TFLOAT},
+	{.key = "CurrentTime", .fmt = "%s: %.16G", .type = TDOUBLE},
 };
 
 static typespec fmetadata[] = {
 	/* [Metadata] */
-	{.key = "Title", .fmt = "%s", .type = TSTRING},
-	{.key = "TitleUnicode", .fmt = "%S", .type = TRUNE},
-	{.key = "Artist", .fmt = "%s", .type = TSTRING},
-	{.key = "ArtistUnicode", .fmt = "%S", .type = TRUNE},
-	{.key = "Creator", .fmt = "%s", .type = TSTRING},
-	{.key = "Version", .fmt = "%s", .type = TSTRING},
-	{.key = "Source", .fmt = "%s", .type = TSTRING},
-	{.key = "Tags", .fmt = "%s", .type = TSTRING},
-	{.key = "BeatmapID", .fmt = "%d", .type = TINT},
-	{.key = "BeatmapSetID", .fmt = "%d", .type = TINT},
+	{.key = "Title", .fmt = "%s:%s", .type = TSTRING},
+	{.key = "TitleUnicode", .fmt = "%s:%S", .type = TRUNE},
+	{.key = "Artist", .fmt = "%s:%s", .type = TSTRING},
+	{.key = "ArtistUnicode", .fmt = "%s:%S", .type = TRUNE},
+	{.key = "Creator", .fmt = "%s:%s", .type = TSTRING},
+	{.key = "Version", .fmt = "%s:%s", .type = TSTRING},
+	{.key = "Source", .fmt = "%s:%s", .type = TSTRING},
+	{.key = "Tags", .fmt = "%s:%s", .type = TSTRING},
+	{.key = "BeatmapID", .fmt = "%s:%d", .type = TINT},
+	{.key = "BeatmapSetID", .fmt = "%s:%d", .type = TINT},
 };
 
 static typespec fdifficulty[] = {
 	/* [Difficulty] */
-	{.key = "HPDrainRate", .fmt = "%.3g", .type = TFLOAT},
-	{.key = "CircleSize", .fmt = "%.3g", .type = TFLOAT},
-	{.key = "OverallDifficulty", .fmt = "%.3g", .type = TFLOAT},
-	{.key = "ApproachRate", .fmt = "%.3g", .type = TFLOAT},
-	{.key = "SliderMultiplier", .fmt = "%.15g", .type = TDOUBLE},
-	{.key = "SliderTickRate", .fmt = "%.3g", .type = TFLOAT},
+	{.key = "HPDrainRate", .fmt = "%s:%.3G", .type = TFLOAT},
+	{.key = "CircleSize", .fmt = "%s:%.3G", .type = TFLOAT},
+	{.key = "OverallDifficulty", .fmt = "%s:%.3G", .type = TFLOAT},
+	{.key = "ApproachRate", .fmt = "%s:%.3G", .type = TFLOAT},
+	{.key = "SliderMultiplier", .fmt = "%s:%.15G", .type = TDOUBLE},
+	{.key = "SliderTickRate", .fmt = "%s:%.3G", .type = TFLOAT},
 };
 
 static typespec fcolours[] = {
 	/* [Colours] */
-	{.key = "Combo1", .fmt = "%s", .type = TSTRING},
-	{.key = "Combo2", .fmt = "%s", .type = TSTRING},
-	{.key = "Combo3", .fmt = "%s", .type = TSTRING},
-	{.key = "Combo4", .fmt = "%s", .type = TSTRING},
-	{.key = "Combo5", .fmt = "%s", .type = TSTRING},
-	{.key = "Combo6", .fmt = "%s", .type = TSTRING},
-	{.key = "Combo7", .fmt = "%s", .type = TSTRING},
-	{.key = "Combo8", .fmt = "%s", .type = TSTRING},
-	{.key = "SliderTrackOverride", .fmt = "%s", .type = TSTRING},
-	{.key = "SliderBorder", .fmt = "%s", .type = TSTRING},
+	{.key = "Combo1", .fmt = "%s : %s", .type = TSTRING},
+	{.key = "Combo2", .fmt = "%s : %s", .type = TSTRING},
+	{.key = "Combo3", .fmt = "%s : %s", .type = TSTRING},
+	{.key = "Combo4", .fmt = "%s : %s", .type = TSTRING},
+	{.key = "Combo5", .fmt = "%s : %s", .type = TSTRING},
+	{.key = "Combo6", .fmt = "%s : %s", .type = TSTRING},
+	{.key = "Combo7", .fmt = "%s : %s", .type = TSTRING},
+	{.key = "Combo8", .fmt = "%s : %s", .type = TSTRING},
+	{.key = "SliderBody", .fmt = "%s : %s", .type = TSTRING},
+	{.key = "SliderTrackOverride", .fmt = "%s : %s", .type = TSTRING},
+	{.key = "SliderBorder", .fmt = "%s : %s", .type = TSTRING},
+	{.key = "StarBreakAdditive", .fmt = "%s : %s", .type = TSTRING},
+	{.key = "SpinnerApproachCircle", .fmt = "%s : %s", .type = TSTRING},
 };
 
 /* Field labels for key:value pairs */
@@ -172,13 +183,13 @@ enum {
 	LNSAMPINDEX,		/* custom sample index */
 	LNVOLUME,		/* volume percentage */
 	LNTYPE,			/* one of rgbline.h:0/linetype/ */
-	LNEFFECTS,		/* extra effects */
+	LNEFFECTS,		/* extra effects ('optional': line definitions on old, old maps do not have this field) */
 };
 
 /* bitmasks for the LNEFFECTS field; apply with & */
 enum {
 	EBKIAI = 0x1,		/* kiai time enabled */
-	EBOMIT = 0x8,		/* unused; nobody cares about osu!taiko or osu!mania */
+	EBOMIT = 0x8,		/* apparently osu!std maps have this effect, huh */
 };
 
 /* colour code csv fields */
@@ -214,6 +225,22 @@ typedef struct splitline {
 	int nfield;		/* elements in **fields */
 } splitline;
 
+
+/* return 0 if line contains any characters besides spaces, tabs or carriage returns */
+static
+int
+isempty(char *line)
+{
+	char *p;
+
+	for (p = line; *p != '\0'; p++)
+		if (*p != '\r' && *p != '\t' && *p != ' ')
+			return 0;
+
+	return 1;
+}
+
+
 /* read a line from bp, and strip out the trailing carriage return. */
 static
 char *
@@ -246,7 +273,7 @@ nextsection(Biobuf *bp)
 	return nil;
 }
 
-/* read the next line from bp, and return it. If the line is empty, return nil (end of section).
+/* read the next line from bp, and return it. If the line is empty (save for whitespace and carriage return), return nil (end of section).
   * returns nil on end-of-file. */
 static
 char *
@@ -255,7 +282,7 @@ nextentry(Biobuf *bp)
 	char *line;
 
 	if ((line = nextline(bp)) != nil) {
-		if (strlen(line) == 0)
+		if (isempty(line) == 1)
 			return nil;
 		else
 			return line;
@@ -331,12 +358,13 @@ csvsplit(char *line, char *sep)
 }
 
 /* split a copy of line[] into two distinct fields, delimited by the
-  * first instance of any characters in sep. This routine also
+  * first instance of any characters in sep. If wstrip is larger than 0, then
+  * kvsplit strips whitespace around the delimiter.
   * trims whitespace around the delimiter.
   * returs a pointer to a splitline struct dynamically allocated with malloc(). */
 static
 splitline *
-kvsplit(char *line, char *sep)
+kvsplit(char *line, char *sep, int wstrip)
 {
 	char *k, *v;
 	splitline *new;
@@ -353,8 +381,10 @@ kvsplit(char *line, char *sep)
 	v[0] = '\0';
 	v++;
 
-	v += strspn(v, " 	");
-	k[strcspn(k, " 	")] = '\0';
+	if (wstrip > 0) {
+		v += strspn(v, " 	");
+		k[strcspn(k, " 	")] = '\0';
+	}
 
 	new->fields[KEY] = k;
 	new->fields[VALUE] = v;
@@ -398,12 +428,13 @@ lookupspec(typespec *speclist, int nspec, char *key)
 
 /* read beatmap entries from bp up until the next blank line
   * add the entry to tp with the corresponding typespec in speclist's
-  * .type value.
+  * .type value. wstrip determines whether whitespace around the delimiter (":")
+  * is stripped or not.
   * returns 0 on success, or BADKEY if key is not in speclist.
   * this routine sets errstr. */
 static
 int
-readentries(table *tp, Biobuf *bp, typespec *speclist, int nspec)
+readentries(table *tp, Biobuf *bp, typespec *speclist, int nspec, int wstrip)
 {
 	char *line;
 	splitline *sp;
@@ -413,7 +444,7 @@ readentries(table *tp, Biobuf *bp, typespec *speclist, int nspec)
 		return -1;
 
 	while ((line = nextentry(bp)) != nil) {
-		sp = kvsplit(line, ":");
+		sp = kvsplit(line, ":", wstrip);
 
 		specp = lookupspec(speclist, nspec, sp->fields[KEY]);
 		if (specp == nil) {
@@ -434,41 +465,40 @@ readentries(table *tp, Biobuf *bp, typespec *speclist, int nspec)
 }
 
 /* for each typespec in speclist, look for an entry in tp whose key value matches
-  * the  's .fmt field. write each entry's value to bp using the typespec's format
-  * argument .fmt, and the given separator sep.
+  * the spec's .key field. write each entry's key and value to bp using the typespec's format
+  * argument .fmt.
   * returns 0 on success. */
 static
 int
-writeentries(table *tp, Biobuf *bp, typespec *speclist, int nspec, char *sep)
+writeentries(table *tp, Biobuf *bp, typespec *speclist, int nspec)
 {
 	entry *ep;
 	int i;
 
-	if (tp == nil || bp == nil || speclist == nil || nspec <= 0 || sep == nil)
+	if (tp == nil || bp == nil || speclist == nil || nspec <= 0)
 		return -1;
 
 	for (i = 0; i < nspec; i++) {
 		ep = lookup(tp, speclist[i].key);
 		if (ep != nil) {
-			Bprint(bp, "%s%s", speclist[i].key, sep);
 			switch(ep->type) {
 			case TRUNE:
-				Bprint(bp, speclist[i].fmt, ep->S);
+				Bprint(bp, speclist[i].fmt, speclist[i].key, ep->S);
 				break;
 			case TSTRING:
-				Bprint(bp, speclist[i].fmt, ep->s);
+				Bprint(bp, speclist[i].fmt, speclist[i].key, ep->s);
 				break;
 			case TINT:
-				Bprint(bp, speclist[i].fmt, ep->i);
+				Bprint(bp, speclist[i].fmt, speclist[i].key, ep->i);
 				break;
 			case TLONG:
-				Bprint(bp, speclist[i].fmt, ep->l);
+				Bprint(bp, speclist[i].fmt, speclist[i].key, ep->l);
 				break;
 			case TFLOAT:
-				Bprint(bp, speclist[i].fmt, ep->f);
+				Bprint(bp, speclist[i].fmt, speclist[i].key, ep->f);
 				break;
 			case TDOUBLE:
-				Bprint(bp, speclist[i].fmt, ep->d);
+				Bprint(bp, speclist[i].fmt, speclist[i].key, ep->d);
 				break;
 			}
 			Bprint(bp, "\r\n");
@@ -490,7 +520,7 @@ rgeneral(beatmap *bmp, Biobuf *bp)
 	if (bmp->general == nil)
 		bmp->general = mktable(8);
 	nspec = sizeof(fgeneral) / sizeof(typespec);
-	return readentries(bmp->general, bp, fgeneral, nspec);
+	return readentries(bmp->general, bp, fgeneral, nspec, 1);
 }
 
 /* write all entries from table *bmp->general to bp.
@@ -506,7 +536,7 @@ wgeneral(beatmap *bmp, Biobuf *bp)
 
 	Bprint(bp, "\r\n[General]\r\n");
 	nspec = sizeof(fgeneral) / sizeof(typespec);
-	return writeentries(bmp->general, bp, fgeneral, nspec, ": ");
+	return writeentries(bmp->general, bp, fgeneral, nspec);
 }
 
 /* read all entries from the [Editor] section, and add them to
@@ -527,7 +557,7 @@ reditor(beatmap *bmp, Biobuf *bp)
 		bmp->editor = mktable(8);
 
 	nspec = sizeof(feditor) / sizeof(typespec);
-	exit = readentries(bmp->editor, bp, feditor, nspec);
+	exit = readentries(bmp->editor, bp, feditor, nspec, 1);
 	if (exit < 0)
 		return exit;
 
@@ -581,7 +611,7 @@ weditor(beatmap *bmp, Biobuf *bp)
 	nspec = sizeof(feditor) / sizeof(typespec);
 
 	Bprint(bp, "\r\n[Editor]\r\n");
-	return writeentries(bmp->editor, bp, feditor, nspec, ": ");
+	return writeentries(bmp->editor, bp, feditor, nspec);
 }
 
 /* read all entries from the [Metadata] section, and add them tp
@@ -596,7 +626,7 @@ rmetadata(beatmap *bmp, Biobuf *bp)
 	if (bmp->metadata == nil)
 		bmp->metadata = mktable(8);
 	nspec = sizeof(fmetadata) / sizeof(typespec);
-	return readentries(bmp->metadata, bp, fmetadata, nspec);
+	return readentries(bmp->metadata, bp, fmetadata, nspec, 0);
 }
 
 /* write all entries from table *bmp->general to bp.
@@ -612,7 +642,7 @@ wmetadata(beatmap *bmp, Biobuf *bp)
 
 	Bprint(bp, "\r\n[Metadata]\r\n");
 	nspec = sizeof(fmetadata) / sizeof(typespec);
-	return writeentries(bmp->metadata, bp, fmetadata, nspec, ":");
+	return writeentries(bmp->metadata, bp, fmetadata, nspec);
 }
 
 /* read all entries from the [Difficulty] section, and add them to
@@ -627,7 +657,7 @@ rdifficulty(beatmap *bmp, Biobuf *bp)
 	if (bmp->difficulty == nil)
 		bmp->difficulty = mktable(8);
 	nspec = sizeof(fdifficulty) / sizeof(typespec);
-	return readentries(bmp->difficulty, bp, fdifficulty, nspec);
+	return readentries(bmp->difficulty, bp, fdifficulty, nspec, 1);
 }
 
 /* write all entries from table *bmp->difficulty to bp.
@@ -643,7 +673,7 @@ wdifficulty(beatmap *bmp, Biobuf *bp)
 
 	Bprint(bp, "\r\n[Difficulty]\r\n");
 	nspec = sizeof(fdifficulty) / sizeof(typespec);
-	return writeentries(bmp->difficulty, bp, fdifficulty, nspec, ":");
+	return writeentries(bmp->difficulty, bp, fdifficulty, nspec);
 }
 
 /* the author doesn't care about storyboarding. As such, revents copies the
@@ -706,17 +736,15 @@ rtimingpoints(beatmap *bmp, Biobuf *bp)
 	char *line;
 	rgline *lp;
 	splitline *sp;
-	int t, type, beats;
-	double vord;
+	 int type, beats;
+	double t, vord;
 
 	while ((line = nextentry(bp)) != nil) {
 		sp = csvsplit(line, ",");
-		if (sp->nfield != LNEFFECTS+1) {
-			print("nfield: %d; lneffects: %d\n", sp->nfield, LNEFFECTS);
+		if (sp->nfield <= LNTYPE || sp->nfield > LNEFFECTS+1)
 			goto badline;
-		}
 
-		t = atol(sp->fields[LNTIME]);
+		t = strtod(sp->fields[LNTIME], nil);
 		vord = strtod(sp->fields[LNVORD], nil);
 		beats = sfatoi(sp->fields[LNBEATS]);
 		type = sfatoi(sp->fields[LNTYPE]);
@@ -728,7 +756,10 @@ rtimingpoints(beatmap *bmp, Biobuf *bp)
 		lp->volume = sfatoi(sp->fields[LNVOLUME]);
 		lp->sampset = sfatoi(sp->fields[LNSAMPSET]);
 		lp->sampindex = sfatoi(sp->fields[LNSAMPINDEX]);
-		lp->kiai = sfatoi(sp->fields[LNEFFECTS]) & EBKIAI;
+		if (sp->nfield > LNEFFECTS) {
+			lp->kiai = sfatoi(sp->fields[LNEFFECTS]) & EBKIAI;
+			lp->omitbl = sfatoi(sp->fields[LNEFFECTS]) & EBOMIT;
+		}
 
 		bmp->rglines = addrglinet(bmp->rglines, lp);
 
@@ -751,6 +782,7 @@ wtimingpoints(beatmap *bmp, Biobuf *bp)
 {
 	rgline *np;
 	double vord;
+	int effects;
 
 	if (bmp->rglines == nil)
 		return 0;
@@ -758,7 +790,8 @@ wtimingpoints(beatmap *bmp, Biobuf *bp)
 	Bprint(bp, "\r\n[TimingPoints]\r\n");
 	for (np = bmp->rglines; np != nil; np = np->next) {
 		vord = (np->type == GLINE) ? np->velocity : np->duration;
-		Bprint(bp, "%ld,%.16g,%d,%d,%d,%d,%d,%d\r\n", np->t, vord, np->beats, np->sampset, np->sampindex, np->volume, np->type, np->kiai);
+		effects = np->omitbl | np->kiai;
+		Bprint(bp, "%.16G,%.16G,%d,%d,%d,%d,%d,%d\r\n", np->t, vord, np->beats, np->sampset, np->sampindex, np->volume, np->type, effects);
 	}
 
 	/* *two* cr-lfs follow [TimingPoints]. Why? Fuck you. */
@@ -785,7 +818,7 @@ rcolours(beatmap *bmp, Biobuf *bp)
 		bmp->colours = mktable(4);
 
 	nspec = sizeof(fcolours) / sizeof(typespec);
-	exit = readentries(bmp->colours, bp, fcolours, nspec);
+	exit = readentries(bmp->colours, bp, fcolours, nspec, 1);
 	if (exit < 0)
 		return exit;
 
@@ -832,7 +865,7 @@ wcolours(beatmap *bmp, Biobuf *bp)
 	}
 
 	Bprint(bp, "\r\n[Colours]\r\n");
-	return writeentries(bmp->colours, bp, fcolours, nspec, " : ");
+	return writeentries(bmp->colours, bp, fcolours, nspec);
 }
 
 /* deserialise all [HitObjects] entries into rgline objects, and add
@@ -842,21 +875,22 @@ wcolours(beatmap *bmp, Biobuf *bp)
   * This routine sets errstr. */
 static
 int
-robjects(beatmap *bmp, Biobuf *bp)
+rhitobjects(beatmap *bmp, Biobuf *bp)
 {
 	hitobject *op;
 	char *line;
 	splitline *sp, *curvessp, *curvesp, *esampsp, *esetssp, *esetsp, *hsampsp;
 	int normal, addition, index, volume;
 	Rune *file;
-	int t, x, y, typebits, type;
+	int x, y, typebits, type;
+	double t;
 	char *hitsamp;
 	int i;
 
 	while ((line = nextentry(bp)) != nil) {
 		sp = csvsplit(line, ",");
 
-		t = atol(sp->fields[OBJTIME]);
+		t = strtod(sp->fields[OBJTIME], nil);
 		x = atoi(sp->fields[OBJX]);
 		y = atoi(sp->fields[OBJY]);
 		typebits = atoi(sp->fields[OBJTYPE]);
@@ -896,19 +930,19 @@ robjects(beatmap *bmp, Biobuf *bp)
 			  *
 			  * I will pay $100 to the first person to slam a pie into peppy's face. */
 			if (sp->nfield > OBJEDGESOUNDS) {
-				op->nsladdition = op->slides + 1;
-				op->sladditions = ecalloc(op->nsladdition, sizeof(int));
 				esampsp = csvsplit(sp->fields[OBJEDGESOUNDS], "|");
+				op->nsladdition = esampsp->nfield;
+				op->sladditions = ecalloc(op->nsladdition, sizeof(int));
 				for (i = 0; i < op->nsladdition; i++)
 					op->sladditions[i] = atoi(esampsp->fields[i]);
 				nukesplitline(esampsp);
 			}
 
 			if (sp->nfield > OBJEDGESETS) {
-				op->nsladdition = op->slides + 1;
+				esetssp = csvsplit(sp->fields[OBJEDGESETS], "|");
+				op->nsladdition = esetssp->nfield;
 				op->slnormalsets = ecalloc(op->nsladdition, sizeof(int));
 				op->sladditionsets = ecalloc(op->nsladdition, sizeof(int));
-				esetssp = csvsplit(sp->fields[OBJEDGESETS], "|");
 				for (i = 0; i < op->nsladdition; i++) {
 					esetsp = csvsplit(esetssp->fields[i], ":");
 					if (esetsp->nfield != SLADDSET+1) {
@@ -931,7 +965,7 @@ robjects(beatmap *bmp, Biobuf *bp)
 
 			break;
 		case TSPINNER:
-			op->spinnerlength = atol(sp->fields[OBJENDTIME]) - t;
+			op->spinnerlength = strtod(sp->fields[OBJENDTIME], nil) - t;
 
 			if (sp->nfield > OBJSPINNERHITSAMP)
 				hitsamp = sp->fields[OBJSPINNERHITSAMP];
@@ -949,7 +983,7 @@ robjects(beatmap *bmp, Biobuf *bp)
 		op->additions = atoi(sp->fields[OBJADDITIONS]);
 		if (hitsamp != nil) {
 			hsampsp = csvsplit(hitsamp, ":");
-			if (hsampsp->nfield != HITSAMPFILE+1) {
+			if (hsampsp->nfield < HITSAMPINDEX || hsampsp->nfield > HITSAMPFILE+1) {
 				werrstr("malformed hitsample definition for object t=%ld: '%s'", op->t, hitsamp);
 				nukesplitline(hsampsp);
 				nukeobj(op);
@@ -958,9 +992,9 @@ robjects(beatmap *bmp, Biobuf *bp)
 
 			normal = atoi(hsampsp->fields[HITSAMPNORMAL]);
 			addition = atoi(hsampsp->fields[HITSAMPADDITIONS]);
-			index = atoi(hsampsp->fields[HITSAMPINDEX]);
-			volume = atoi(hsampsp->fields[HITSAMPVOLUME]);
-			file = estrrunedup(hsampsp->fields[HITSAMPFILE]);
+			index = (hsampsp->nfield > HITSAMPINDEX) ? atoi(hsampsp->fields[HITSAMPINDEX]) : -1;
+			volume = (hsampsp->nfield > HITSAMPVOLUME) ? atoi(hsampsp->fields[HITSAMPVOLUME]) : -1;
+			file = (hsampsp->nfield > HITSAMPFILE) ? estrrunedup(hsampsp->fields[HITSAMPFILE]) : nil;
 
 			op->samp = mkhitsample(normal, addition, index, volume, file);
 			nukesplitline(hsampsp);
@@ -984,7 +1018,7 @@ robjects(beatmap *bmp, Biobuf *bp)
   * returns 0 on success. */
 static
 int
-wobjects(beatmap *bmp, Biobuf *bp)
+whitobjects(beatmap *bmp, Biobuf *bp)
 {
 	int i;
 	hitobject *op;
@@ -998,7 +1032,7 @@ wobjects(beatmap *bmp, Biobuf *bp)
 		if (op->newcombo == 1)
 			typebits |= TBNEWCOMBO | (op->comboskip << TBCOLORSHIFT);
 
-		Bprint(bp, "%d,%d,%ld,%d,%d", op->x, op->y, op->t, typebits, op->additions);
+		Bprint(bp, "%d,%d,%.16G,%d,%d", op->x, op->y, op->t, typebits, op->additions);
 
 		switch(op->type) {
 		case TCIRCLE:
@@ -1008,7 +1042,7 @@ wobjects(beatmap *bmp, Biobuf *bp)
 			for (ap = op->anchors; ap != nil; ap = ap->next)
 				Bprint(bp, "|%d:%d", ap->x, ap->y);
 
-			Bprint(bp, ",%d,%.16g", op->slides, op->length);
+			Bprint(bp, ",%d,%.16G", op->slides, op->length);
 
 			if (op->sladditions != nil) {
 				Bprint(bp, ",%d", op->sladditions[0]);
@@ -1024,15 +1058,19 @@ wobjects(beatmap *bmp, Biobuf *bp)
 
 			break;
 		case TSPINNER:
-			Bprint(bp, ",%ld", op->t + op->spinnerlength);
+			Bprint(bp, ",%.11G", op->t + op->spinnerlength);
 
 			break;
 		}
 
 		if (op->samp != nil) {
 			Bprint(bp, ",%d:%d", op->samp->normal, op->samp->addition);
-			Bprint(bp, ":%d:%d", op->samp->index, op->samp->volume);
-			Bprint(bp, ":%S", op->samp->file);
+			if (op->samp->index >= 0)
+				Bprint(bp, ":%d", op->samp->index);
+			if (op->samp->volume >= 0)
+				Bprint(bp, ":%d", op->samp->volume);
+			if (op->samp->file != nil)
+				Bprint(bp, ":%S", op->samp->file);
 		}
 
 		Bprint(bp, "\r\n");
@@ -1041,8 +1079,7 @@ wobjects(beatmap *bmp, Biobuf *bp)
 	return 0;
 }
 
-/* create a new beatmap object
-  * returns nil when out of memory. */
+/* create a new beatmap object */
 beatmap *
 mkbeatmap()
 {

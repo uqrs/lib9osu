@@ -25,7 +25,7 @@ typedef struct hitobject hitobject;
 typedef struct hitobject {
 	hitobject *next;	/* next node in object list */
 
-	long t;			/* timestamp in ms */
+	double t;			/* timestamp in ms */
 	int x,y;			/* x and y positions in 'osu pixels' */
 	uchar type;		/* one of enum objtypes */
 	double length;		/* "visual length in osu! pixels." may be truncated with "no consequences". */
@@ -49,15 +49,15 @@ typedef struct hitobject {
 	anchor *anchors;	/* head of anchor list */
 
 	/* spinners */
-	long spinnerlength;  /* spinner duration in ms */
+	double spinnerlength;  /* spinner duration in ms */
 } hitobject;
 
-hitobject *mkobj(uchar type, long t, int x, int y);
+hitobject *mkobj(uchar type, double t, int x, int y);
 void nukeobj(hitobject *obj);
 hitobject *addobjt(hitobject *listp, hitobject *op);
-hitobject *moveobjt(hitobject *listp, hitobject *op, long t);
+hitobject *moveobjt(hitobject *listp, hitobject *op, double t);
 hitobject *rmobj(hitobject *listp, hitobject *op);
-hitobject *lookupobjt(hitobject *listp, long t);
+hitobject *lookupobjt(hitobject *listp, double t);
 hitobject *lookupobjn(hitobject *listp, uint n);
 anchor *mkanch(int x, int y);
 anchor *addanchn(anchor *alistp, anchor *ap, uint n);
