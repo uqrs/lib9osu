@@ -15,49 +15,13 @@
   * example/garden.osu
   * example/neoprene.osu */
 
-/* beatmap section handler prototypes */
-static int rgeneral(beatmap *bmp, Biobuf *bp);
-static int reditor(beatmap *bmp, Biobuf *bp);
-static int rmetadata(beatmap *bmp, Biobuf *bp);
-static int rdifficulty(beatmap *bmp, Biobuf *bp);
-static int revents(beatmap *bmp, Biobuf *bp);
-static int rtimingpoints(beatmap *bmp, Biobuf *bp);
-static int rcolours(beatmap *bmp, Biobuf *bp);
-static int rhitobjects(beatmap *bmp, Biobuf *bp);
-
-static int wgeneral(beatmap *bmp, Biobuf *bp);
-static int weditor(beatmap *bmp, Biobuf *bp);
-static int wmetadata(beatmap *bmp, Biobuf *bp);
-static int wdifficulty(beatmap *bmp, Biobuf *bp);
-static int wevents(beatmap *bmp, Biobuf *bp);
-static int wtimingpoints(beatmap *bmp, Biobuf *bp);
-static int wcolours(beatmap *bmp, Biobuf *bp);
-static int whitobjects(beatmap *bmp, Biobuf *bp);
-
-typedef struct typespec {
+typedef struct kvdef {
 	char *key;		/* string key of entry */
 	char *fmt;		/* format string for output */
 	int type;		/* the data type of the associated value. see hash.h:2,9 */
-} typespec;
+} kvdef;
 
-typedef struct handler {
-	char *section;					/* section name, e.g. "[General]" */
-	int (*read)(beatmap *, Biobuf *);	/* read handler for this section, e.g. rgeneral */
-	int (*write)(beatmap *, Biobuf *);	/* write handler for this section, e.g. wgeneral */
-} handler;
-
-static handler handlers[] = {
-	{.section = "[General]", .read = rgeneral, .write = wgeneral},
-	{.section = "[Editor]", .read = reditor, .write = weditor},
-	{.section = "[Metadata]", .read = rmetadata, .write = wmetadata},
-	{.section = "[Difficulty]", .read = rdifficulty, .write = wdifficulty},
-	{.section = "[Events]", .read = revents, .write = wevents},
-	{.section = "[TimingPoints]", .read = rtimingpoints, .write = wtimingpoints},
-	{.section = "[Colours]", .read = rcolours, .write = wcolours},
-	{.section = "[HitObjects]", .read = rhitobjects, .write = whitobjects},
-};
-
-static typespec fgeneral[] = {
+static kvdef kvgeneral[] = {
 	/* [General] */
 	{.key = "AudioFilename", .fmt = "%s: %S", .type = TRUNE},
 	{.key = "AudioLeadIn", .fmt = "%s: %ld", .type = TLONG},
@@ -67,17 +31,20 @@ static typespec fgeneral[] = {
 	{.key = "StackLeniency", .fmt = "%s: %G", .type = TFLOAT},
 	{.key = "Mode", .fmt = "%s: %d", .type = TINT},
 	{.key = "LetterboxInBreaks", .fmt = "%s: %d", .type = TINT},
+	{.key = "EditorBookmarks", .fmt = "%s: %s", .type = TSTRING},			/* deprecated; replaced by :/"Bookmarks"/ */
+	{.key = "EditorDistanceSpacing", .fmt = "%s: %.16G", .type = TDOUBLE},	/* deprecated; replaced by :/"DistanceSpacing"/ */
 	{.key = "StoryFireInFront", .fmt = "%s: %d", .type = TINT},
 	{.key = "UseSkinSprites", .fmt = "%s: %d", .type = TINT},
 	{.key = "OverlayPosition", .fmt = "%s: %s", .type = TSTRING},
 	{.key = "SkinPreference", .fmt = "%s:%s", .type = TSTRING},
 	{.key = "EpilepsyWarning", .fmt = "%s: %d", .type = TINT},
 	{.key = "CountdownOffset", .fmt = "%s: %d", .type = TINT},
+	{.key = "SpecialStyle", .fmt = "%s: %d", .type = TINT},
 	{.key = "WidescreenStoryboard", .fmt = "%s: %d", .type = TINT},
 	{.key = "SamplesMatchPlaybackRate", .fmt = "%s: %d", .type = TINT},
 };
 
-static typespec feditor[] = {
+static kvdef kveditor[] = {
 	/* [Editor] */
 	{.key = "Bookmarks", .fmt = "%s: %s", .type = TSTRING},
 	{.key = "DistanceSpacing", .fmt = "%s: %.16G", .type = TDOUBLE},
@@ -87,7 +54,7 @@ static typespec feditor[] = {
 	{.key = "CurrentTime", .fmt = "%s: %.16G", .type = TDOUBLE},
 };
 
-static typespec fmetadata[] = {
+static kvdef kvmetadata[] = {
 	/* [Metadata] */
 	{.key = "Title", .fmt = "%s:%s", .type = TSTRING},
 	{.key = "TitleUnicode", .fmt = "%s:%S", .type = TRUNE},
@@ -101,17 +68,17 @@ static typespec fmetadata[] = {
 	{.key = "BeatmapSetID", .fmt = "%s:%d", .type = TINT},
 };
 
-static typespec fdifficulty[] = {
+static kvdef kvdifficulty[] = {
 	/* [Difficulty] */
 	{.key = "HPDrainRate", .fmt = "%s:%.3G", .type = TFLOAT},
 	{.key = "CircleSize", .fmt = "%s:%.3G", .type = TFLOAT},
 	{.key = "OverallDifficulty", .fmt = "%s:%.3G", .type = TFLOAT},
 	{.key = "ApproachRate", .fmt = "%s:%.3G", .type = TFLOAT},
 	{.key = "SliderMultiplier", .fmt = "%s:%.15G", .type = TDOUBLE},
-	{.key = "SliderTickRate", .fmt = "%s:%.3G", .type = TFLOAT},
+	{.key = "SliderTickRate", .fmt = "%s:%.16G", .type = TDOUBLE},
 };
 
-static typespec fcolours[] = {
+static kvdef kvcolours[] = {
 	/* [Colours] */
 	{.key = "Combo1", .fmt = "%s : %s", .type = TSTRING},
 	{.key = "Combo2", .fmt = "%s : %s", .type = TSTRING},
@@ -124,20 +91,29 @@ static typespec fcolours[] = {
 	{.key = "SliderBody", .fmt = "%s : %s", .type = TSTRING},
 	{.key = "SliderTrackOverride", .fmt = "%s : %s", .type = TSTRING},
 	{.key = "SliderBorder", .fmt = "%s : %s", .type = TSTRING},
+	{.key = "SliderBorderColor", .fmt = "%s : %s", .type = TSTRING},
 	{.key = "StarBreakAdditive", .fmt = "%s : %s", .type = TSTRING},
 	{.key = "SpinnerApproachCircle", .fmt = "%s : %s", .type = TSTRING},
 };
+
+static int nkvgeneral = sizeof(kvgeneral) / sizeof(kvdef);
+static int nkveditor = sizeof(kveditor) / sizeof(kvdef);
+static int nkvmetadata = sizeof(kvmetadata) / sizeof(kvdef);
+static int nkvdifficulty = sizeof(kvdifficulty) / sizeof(kvdef);
+static int nkvcolours =  sizeof(kvcolours) / sizeof(kvdef);
 
 /* Field labels for key:value pairs */
 enum {
 	KEY=0,
 	VALUE,
 };
+int maxkvfields = VALUE + 1;
 
 /* CSV field labels for hitobject entries 
   * See: https://osu.ppy.sh/wiki/en/osu%21_File_Formats/Osu_%28file_format%29#hit-objects
   */
 enum {
+	/* ! = optional field */
 	OBJX=0,				/* x position of object */
 	OBJY,				/* y position of object */
 	OBJTIME,				/* timestamp in milliseconds */
@@ -145,14 +121,15 @@ enum {
 	OBJADDITIONS,		/* hitsound additions for object */
 	OBJENDTIME=5,		/* spinner end timestamp */
 	OBJCURVES=5,			/* slider curve data */
-	OBJCIRCLEHITSAMP=5,	/* custom hitsound sampleset (circles) */
-	OBJSPINNERHITSAMP=6,	/* custom hitsound sampleset (spinners) */
+	OBJCIRCLEHITSAMP=5,	/* ! custom hitsound sampleset (circles) */
+	OBJSPINNERHITSAMP=6,	/* ! custom hitsound sampleset (spinners) */
 	OBJSLIDES=6,			/* amount of reverses + 1 */
 	OBJLENGTH,			/* ""visual length in osu! pixels"" */
-	OBJEDGESOUNDS,		/* slider head/tail hitsounds */
-	OBJEDGESETS,			/* slider head/tail sample sets */
-	OBJSLIDERHITSAMP		/* custom hitsound sampleset (sliders) */
+	OBJEDGESOUNDS,		/* ! slider head/tail hitsounds */
+	OBJEDGESETS,			/* ! slider head/tail sample sets */
+	OBJSLIDERHITSAMP		/* ! custom hitsound sampleset (sliders) */
 };
+int maxobjfields = OBJSLIDERHITSAMP + 1;
 
 /* C(olon)SV and P(ipe)SV fields for OBJCURVES and OBJSAMP */
 enum {
@@ -163,6 +140,7 @@ enum {
 	HITSAMPVOLUME,
 	HITSAMPFILE,
 };
+int maxhitsampfields = HITSAMPFILE + 1;
 
 /* bitmasks for the OBJTYPE field; apply with & */
 enum {
@@ -170,26 +148,28 @@ enum {
 	TBNEWCOMBO = 0x4,	/* new combo */
 	TBCOLOR = 0x70,		/* amount of colours to skip */
 	TBCOLORSHIFT = 4,		/* shift right amount after having applied & TCOLOR  */
-	TBHOLD = 0x80, 		/* unsupported; nobody cares about osu!mania */
+	TBHOLD = 0x80, 		/* nobody cares about osu!mania */
 };
 
 /* CSV fields for red/greenline entries 
   * see: https://osu.ppy.sh/wiki/en/osu%21_File_Formats/Osu_%28file_format%29#timing-points */
 enum {
+	/* ! = optional field */
 	LNTIME=0,		/* timestamp in miliseconds */
 	LNVORD=1,		/* duration of beat in miliseconds (redline), or negative inverse slider velocity multiplier (greenline) */
 	LNBEATS,			/* number of beats in measure */
 	LNSAMPSET,		/* default hitobject sampleset */
 	LNSAMPINDEX,		/* custom sample index */
 	LNVOLUME,		/* volume percentage */
-	LNTYPE,			/* one of rgbline.h:0/linetype/ */
-	LNEFFECTS,		/* extra effects ('optional': line definitions on old, old maps do not have this field) */
+	LNTYPE,			/* ! one of rgbline.h:0/linetype/ */
+	LNEFFECTS,		/* ! extra effects */
 };
+int maxrglinefields = LNEFFECTS + 1;
 
-/* bitmasks for the LNEFFECTS field; apply with & */
+/* bitmasks for the rgline.effects field; apply with & */
 enum {
 	EBKIAI = 0x1,		/* kiai time enabled */
-	EBOMIT = 0x8,		/* apparently osu!std maps have this effect, huh */
+	EBOMIT = 0x8,		/* omit first barline */
 };
 
 /* colour code csv fields */
@@ -211,33 +191,35 @@ enum {
 	SLADDSET,
 };
 
-/* Possible values for LNSAMPSET field. Indices correspond to hitsound.h:/sampsets/ */
-char *samplesets[] = {
-	"Default",		/* unused */
-	"Normal",
-	"Soft",
-	"Drum"
-};
-
-typedef struct splitline {
-	char *line;		/* line string, with delimiters replaced by '\0' */
-	char **fields;	/* field pointers */
-	int nfield;		/* elements in **fields */
-} splitline;
-
-
 /* return 0 if line contains any characters besides spaces, tabs or carriage returns */
 static
 int
-isempty(char *line)
+isempty(char *ln)
 {
 	char *p;
 
-	for (p = line; *p != '\0'; p++)
+	if (ln == nil)
+		return -1;
+
+	for (p = ln; *p != '\0'; p++)
 		if (*p != '\r' && *p != '\t' && *p != ' ')
 			return 0;
 
 	return 1;
+}
+
+/* return 1 if line contains a section header, 0 otherwise */
+static
+int
+isheader(char *ln)
+{
+	if (ln == nil)
+		return -1;
+
+	if (ln[0] == '[' && ln[strlen(ln)-1] == ']')
+		return 1;
+	else
+		return 0;
 }
 
 
@@ -246,12 +228,12 @@ static
 char *
 nextline(Biobuf *bp)
 {
-	char *line;
+	char *ln;
 
-	if ((line = Brdstr(bp, '\n', 1)) != nil) {
-		if (line[strlen(line) - 1] == '\r')
-			line[strlen(line) - 1] = '\0';
-		return line;
+	if ((ln = Brdstr(bp, '\n', 1)) != nil) {
+		if (ln[strlen(ln) - 1] == '\r')
+			ln[strlen(ln) - 1] = '\0';
+		return ln;
 	}
 
 	return nil;
@@ -263,32 +245,76 @@ static
 char *
 nextsection(Biobuf *bp)
 {
-	char *line;
+	char *ln;
 
-	while ((line = nextline(bp)) != nil) {
-		if (line[0] == '[' && line[strlen(line) - 1] == ']')
-			return line;
+	while ((ln = nextline(bp)) != nil) {
+		if (isheader(ln) == 1)
+			return ln;
+		free(ln);
 	}
 
+	/* end-of-file */
 	return nil;
 }
 
-/* read the next line from bp, and return it. If the line is empty (save for whitespace and carriage return), return nil (end of section).
-  * returns nil on end-of-file. */
+/* read the next line from bp, and return it, skipping empty lines.
+  * returns nil at the next section header, or end-of-file. */
 static
 char *
 nextentry(Biobuf *bp)
 {
-	char *line;
+	char *ln;
 
-	if ((line = nextline(bp)) != nil) {
-		if (isempty(line) == 1)
+	while ((ln = nextline(bp)) != nil) {
+		if (isheader(ln) == 1) {
+			Bseek(bp, -(Blinelen(bp)+1), 1);
 			return nil;
-		else
-			return line;
+		} else if (isempty(ln) == 0) {
+			return ln;
+		}
+
+		free(ln);
 	}
 
+	/* end-of-file */
 	return nil;
+}
+
+/* read the raw contents of the current section into a malloc'd string
+  * returns a pointer to the string on success, nil on failure */
+static
+char *
+readsection(Biobuf *bp)
+{
+	int nchar;
+	int maxchar;
+	int len;
+	char *ln, *section;
+
+	nchar = 0;
+	maxchar = 256;
+	section = ecalloc(maxchar, sizeof(char));
+
+	while ((ln = nextentry(bp)) != nil) {
+		len = strlen(ln);
+
+		/* + 2 for carriage return and newline */
+		if (nchar + len + 2 > maxchar) {
+			do {
+				maxchar *= 2;
+			} while (nchar + len + 2 > maxchar);
+
+			section = erealloc(section, sizeof(char) * maxchar);
+		}
+
+		strcat(section, ln);
+		strcat(section, "\r\n");
+
+		nchar += len + 2;
+		free(ln);
+	}
+
+	return section;
 }
 
 /* return a pointer to the end of a quoted field starting at p.
@@ -312,71 +338,81 @@ advquoted(char *p, char *sep)
 	return p + j;
 }
 
-/* split a copy of line[] into separate fields delimited by any of the characters in sep.
-  * returns a pointer to a splitline struct dynamically allocated with malloc(). */
+/* count the amount of CSV fields in ln
+  * returns the amount of fields on success, or -1 on failure */
 static
-splitline *
-csvsplit(char *line, char *sep)
+int
+csvcountf(char *ln, char *sep)
 {
-	int maxfield;
-	splitline *new;
+	char *p;
+	int n;
+
+	if (ln == nil || sep == nil)
+		return -1;
+
+	n = 0;
+	for (p = ln; *p != '\0'; p++) {
+		if (*p == *sep)
+			n++;
+		else if (*p == '"')
+			p = advquoted(++p, sep);
+	}
+
+	return n+1;
+}
+
+/* replace each sep in line[] with a null character, and store pointers to the
+  * start of each field in fields[]. returns the amount of split fields. */
+static
+int
+csvsplit(char *ln, char **fields, int nfields, char *sep)
+{
 	char *sepp;
 	char sepc;
 	char *p;
+	int i;
 
-	if (line == nil || line[0] == '\0' || sep == nil)
-		return nil;
+	if (ln == nil || fields == nil || nfields < 0 || sep == nil)
+		return -1;
 
 	sepp = nil;
-	maxfield = 9;
+	p = ln;
+	i = 0;
 
-	new = ecalloc(1, sizeof(splitline));
-	new->fields = ecalloc(maxfield, sizeof(char *));
-	new->line = p = strdup(line);
-	new->nfield = 0;
+	if (*p == '\0')
+		return 0;
 
 	do {
-		if (new->nfield+1 == maxfield) {
-			maxfield *= 2;
-			new->fields = erealloc(new->fields, sizeof(char *) * maxfield);
-		}
-
-		if (p[0] == '"')
+		if (*p == '"')
 			sepp = advquoted(++p, sep);
 		else
 			sepp = p + strcspn(p, sep);
 
-		sepc = sepp[0];
-		sepp[0] = '\0';
-		new->fields[new->nfield++] = p;
+		sepc = *sepp;
+		*sepp = '\0';
+		fields[i++] = p;
 
 		sepp++;
 		p = sepp + strspn(sepp, sep);
-	} while (sepc == sep[0]);
+	} while (sepc == sep[0] && i < nfields);
 
-	return new;
+	return i;
 }
 
-/* split a copy of line[] into two distinct fields, delimited by the
+/* split line[] into two distinct fields, delimited by the
   * first instance of any characters in sep. If wstrip is larger than 0, then
   * kvsplit strips whitespace around the delimiter.
-  * trims whitespace around the delimiter.
-  * returs a pointer to a splitline struct dynamically allocated with malloc(). */
+  * returns the number of split fields (realistically, always '2') */
 static
-splitline *
-kvsplit(char *line, char *sep, int wstrip)
+int
+kvsplit(char *ln, char **fields, int nfields, char *sep, int wstrip)
 {
 	char *k, *v;
-	splitline *new;
 
-	if (line == nil || line[0] == '\0' || sep == nil)
-		return nil;
+	if (ln == nil || ln[0] == '\0' || sep == nil)
+		return -1;
 
-	new = ecalloc(1, sizeof(splitline));
-	new->nfield = 2;
-	new->fields = ecalloc(2, sizeof(char *));
-
-	new->line = k = estrdup(line);
+	k = ln;
 	v = k + strcspn(k, sep);
 	v[0] = '\0';
 	v++;
@@ -386,697 +422,367 @@ kvsplit(char *line, char *sep, int wstrip)
 		k[strcspn(k, " 	")] = '\0';
 	}
 
-	new->fields[KEY] = k;
-	new->fields[VALUE] = v;
+	fields[KEY] = k;
+	fields[VALUE] = v;
 
-	return new;
+	return 2;
 }
 
-/* send a splitline to the shadow realm. */
+/* search through an nkvlist-sized kvlist[], and return a pointer
+  * to the first kvdef in kvlist[] whose key value matches k.
+  * returns nil if no matches were found.
+  * lookupkvdef searches case insensitively */
 static
-void
-nukesplitline(splitline *sp)
-{
-	if (sp == nil)
-		return;
-
-	free(sp->line);
-	free(sp->fields);
-	free(sp);
-
-	return;
-}
-
-/* search through an nspec-sized speclist[], and return a pointer
-  * to the first typespec in speclist[] whose key value matches the final argument
-  * returns nil if no matches were found */
-static
-typespec *
-lookupspec(typespec *speclist, int nspec, char *key)
+kvdef *
+lookupkvdef(kvdef *kvlist, int nkvlist, char *k)
 {
 	int i;
 
-	if (key == nil || nspec <= 0)
+	if (k == nil || nkvlist <= 0)
 		return nil;
 
-	for (i = 0; i < nspec; i++)
-		if (strcmp(speclist[i].key, key) == 0)
-			return &speclist[i];
+	for (i = 0; i < nkvlist; i++)
+		if (cistrcmp(kvlist[i].key, k) == 0)
+			return &kvlist[i];
 
 	return nil;
 }
 
-/* read beatmap entries from bp up until the next blank line
-  * add the entry to tp with the corresponding typespec in speclist's
-  * .type value. wstrip determines whether whitespace around the delimiter (":")
-  * is stripped or not.
-  * returns 0 on success, or BADKEY if key is not in speclist.
-  * this routine sets errstr. */
+/* create a new entry object from s, and assigns it to *epp.
+  * if wstrip is non-zero, strip whitespace around the delimiter
+  * returns 0 on success, -1 on failure.
+  * this routine sets errstr */
 static
 int
-readentries(table *tp, Biobuf *bp, typespec *speclist, int nspec, int wstrip)
+strtoentry(char *s, entry **epp, kvdef *kvlist, int nkvlist, int wstrip)
 {
-	char *line;
-	splitline *sp;
-	typespec *specp;
+	char **fields;
+	entry *ep;
+	kvdef *kvdefp;
 
-	if (tp == nil || bp == nil || speclist == nil || nspec <= 0)
+	if (s == nil || epp == nil || kvlist == nil || nkvlist <= 0 || wstrip < 0)
 		return -1;
 
-	while ((line = nextentry(bp)) != nil) {
-		sp = kvsplit(line, ":", wstrip);
+	fields = ecalloc(maxkvfields, sizeof(char *));
+	kvsplit(s, fields, maxkvfields, ":", wstrip);
 
-		specp = lookupspec(speclist, nspec, sp->fields[KEY]);
-		if (specp == nil) {
-			werrstr("Unknown configuration key '%s'", sp->fields[KEY]);
-			free(line);
-			nukesplitline(sp);
-
-			return BADKEY;
-		}
-
-		addentry(tp, mkentry(sp->fields[KEY], sp->fields[VALUE], specp->type));
-
-		free(line);
-		nukesplitline(sp);
-	}
-
-	return 0;
-}
-
-/* for each typespec in speclist, look for an entry in tp whose key value matches
-  * the spec's .key field. write each entry's key and value to bp using the typespec's format
-  * argument .fmt.
-  * returns 0 on success. */
-static
-int
-writeentries(table *tp, Biobuf *bp, typespec *speclist, int nspec)
-{
-	entry *ep;
-	int i;
-
-	if (tp == nil || bp == nil || speclist == nil || nspec <= 0)
+	kvdefp = lookupkvdef(kvlist, nkvlist, fields[KEY]);
+	if (kvdefp == nil) {
+		werrstr("unknown configuration key %s", fields[KEY]);
+		free(fields);
 		return -1;
-
-	for (i = 0; i < nspec; i++) {
-		ep = lookup(tp, speclist[i].key);
-		if (ep != nil) {
-			switch(ep->type) {
-			case TRUNE:
-				Bprint(bp, speclist[i].fmt, speclist[i].key, ep->S);
-				break;
-			case TSTRING:
-				Bprint(bp, speclist[i].fmt, speclist[i].key, ep->s);
-				break;
-			case TINT:
-				Bprint(bp, speclist[i].fmt, speclist[i].key, ep->i);
-				break;
-			case TLONG:
-				Bprint(bp, speclist[i].fmt, speclist[i].key, ep->l);
-				break;
-			case TFLOAT:
-				Bprint(bp, speclist[i].fmt, speclist[i].key, ep->f);
-				break;
-			case TDOUBLE:
-				Bprint(bp, speclist[i].fmt, speclist[i].key, ep->d);
-				break;
-			}
-			Bprint(bp, "\r\n");
-		}
 	}
+
+	if ((ep = mkentry(fields[KEY], fields[VALUE], kvdefp->type)) == nil) {
+		werrstr("malformed keyval definition");
+		free(fields);
+		return -1;
+	}
+
+	free(fields);
+	*epp = ep;
 
 	return 0;
 }
 
-/* read all entries from the [General] section, and add them to
-  * table *bmp->general.
-  * returns readentries' exit code. */
+/* create a new rgline object from the line definition in s, and assigns it to *lpp.
+  * returns 0 on success, -1 on failure.
+  * this routine sets errstr */
 static
 int
-rgeneral(beatmap *bmp, Biobuf *bp)
+strtoline(char *s, rgline **lpp)
 {
-	int nspec;
-
-	if (bmp->general == nil)
-		bmp->general = mktable(8);
-	nspec = sizeof(fgeneral) / sizeof(typespec);
-	return readentries(bmp->general, bp, fgeneral, nspec, 1);
-}
-
-/* write all entries from table *bmp->general to bp.
-  * returns writeentries' exit code. */
-static
-int
-wgeneral(beatmap *bmp, Biobuf *bp)
-{
-	int nspec;
-
-	if (bmp->general == nil)
-		return 0;
-
-	Bprint(bp, "\r\n[General]\r\n");
-	nspec = sizeof(fgeneral) / sizeof(typespec);
-	return writeentries(bmp->general, bp, fgeneral, nspec);
-}
-
-/* read all entries from the [Editor] section, and add them to
-  * table *bmp->editor.
-  * deserialise bookmarks' value into a list of bmp->nbookmarks
-  * number of longs, now assigned to bmp->bookmarks, and remove
-  * the "Bookmarks" entry from bmp->editor
-  * returns readentries' exit code on failure, or 0 on success. */
-static
-int
-reditor(beatmap *bmp, Biobuf *bp)
-{
-	int i, nspec, exit;
-	entry *ep;
-	splitline *sp;
-
-	if (bmp->editor == nil)
-		bmp->editor = mktable(8);
-
-	nspec = sizeof(feditor) / sizeof(typespec);
-	exit = readentries(bmp->editor, bp, feditor, nspec, 1);
-	if (exit < 0)
-		return exit;
-
-	if ((ep = lookup(bmp->editor, "Bookmarks")) != nil) {
-		sp = csvsplit(ep->s, ",");
-		if (sp->nfield > 0) {
-			bmp->bookmarks = ecalloc(sp->nfield, sizeof(long));
-			for (i = 0; i < sp->nfield; i++)
-				bmp->bookmarks[i] = atol(sp->fields[i]);
-
-			bmp->nbookmark = sp->nfield;
-		}
-		nukesplitline(sp);
-		nukeentry(rmentry(bmp->editor, ep));
-	}
-
-	return 0;
-}
-
-/* write all entries from table *bmp->general to bp, including
-  * a comma-separated string representation of 
-  * long *bmp->bookmarks for the "Bookmarks" entry.
-  * returns writeentries' exit code. */
-static
-int
-weditor(beatmap *bmp, Biobuf *bp)
-{
-	int i, nspec;
-	char *ulongmax;
-	char *bookmarks, *p;
-
-	if (bmp->editor == nil)
-		return 0;
-
-	if (bmp->nbookmark > 0) {
-		ulongmax = smprint("%uld", (ulong)-1);
-		bookmarks = p = ecalloc((strlen(ulongmax)+1)*bmp->nbookmark + 1, sizeof(char));
-		free(ulongmax);
-
-		for (i = 0; i < bmp->nbookmark; i++) {
-			sprint(p, ",%ld", bmp->bookmarks[i]);
-			for (;*p != '\0'; p++)
-				;
-		}
-		p = bookmarks + 1;
-
-		addentry(bmp->editor, mkentry("Bookmarks", p, TSTRING));
-		free(bookmarks);
-	}
-
-	nspec = sizeof(feditor) / sizeof(typespec);
-
-	Bprint(bp, "\r\n[Editor]\r\n");
-	return writeentries(bmp->editor, bp, feditor, nspec);
-}
-
-/* read all entries from the [Metadata] section, and add them tp
-  * table *bmp->metadata.
-  * returns readentries' exit code. */
-static
-int
-rmetadata(beatmap *bmp, Biobuf *bp)
-{
-	int nspec;
-
-	if (bmp->metadata == nil)
-		bmp->metadata = mktable(8);
-	nspec = sizeof(fmetadata) / sizeof(typespec);
-	return readentries(bmp->metadata, bp, fmetadata, nspec, 0);
-}
-
-/* write all entries from table *bmp->general to bp.
-  * returns writeentries' exit code. */
-static
-int
-wmetadata(beatmap *bmp, Biobuf *bp)
-{
-	int nspec;
-
-	if (bmp->metadata == nil)
-		return 0;
-
-	Bprint(bp, "\r\n[Metadata]\r\n");
-	nspec = sizeof(fmetadata) / sizeof(typespec);
-	return writeentries(bmp->metadata, bp, fmetadata, nspec);
-}
-
-/* read all entries from the [Difficulty] section, and add them to
-  * table *bmp->difficulty.
-  * returns readentries' exit code. */
-static
-int
-rdifficulty(beatmap *bmp, Biobuf *bp)
-{
-	int nspec;
-
-	if (bmp->difficulty == nil)
-		bmp->difficulty = mktable(8);
-	nspec = sizeof(fdifficulty) / sizeof(typespec);
-	return readentries(bmp->difficulty, bp, fdifficulty, nspec, 1);
-}
-
-/* write all entries from table *bmp->difficulty to bp.
-  * returns writeentries' exit code. */
-static
-int
-wdifficulty(beatmap *bmp, Biobuf *bp)
-{
-	int nspec;
-
-	if (bmp->difficulty == nil)
-		return 0;
-
-	Bprint(bp, "\r\n[Difficulty]\r\n");
-	nspec = sizeof(fdifficulty) / sizeof(typespec);
-	return writeentries(bmp->difficulty, bp, fdifficulty, nspec);
-}
-
-/* the author doesn't care about storyboarding. As such, revents copies the
-  * raw [Events] contents into a char *bmp->events, with carriage returns restored.
-  * returns 0 on success */
-static
-int
-revents(beatmap *bmp, Biobuf *bp)
-{
-	int nchar;
-	int maxchar;
-	int len;
-	char *line;
-
-	nchar = 0;
-	maxchar = 256;
-	bmp->events = ecalloc(maxchar, sizeof(char));
-
-	while ((line = nextentry(bp)) != nil) {
-		len = strlen(line);
-
-		/* + 2 for carriage return and newline */
-		if (nchar + len + 2 > maxchar) {
-			do {
-				maxchar *= 2;
-			} while (nchar + len + 2 > maxchar);
-
-			bmp->events = erealloc(bmp->events, sizeof(char) * maxchar);
-		}
-
-		strcat(bmp->events, line);
-		strcat(bmp->events, "\r\n");
-
-		nchar += len + 2;
-		free(line);
-	}
-
-	return 0;
-}
-
-/* write the raw contents of *bmp->events to bp.
-  * returns 0 on success. */
-static
-int
-wevents(beatmap *bmp, Biobuf *bp)
-{
-	Bprint(bp,"\r\n[Events]\r\n");
-	Bprint(bp, "%s", bmp->events);
-
-	return 0;
-}
-/* deserialise all [TimingPoints] entries into rgline objects, and add
-  * them to list rline *bmp->rglines.
-  * returns 0 on success, or BADLINE on .osu syntax errors.
-  * This routine sets errstr. */
-static
-int
-rtimingpoints(beatmap *bmp, Biobuf *bp)
-{
-	char *line;
+	char **fields;
+	int nfields;
+	int effects, type, beats;
 	rgline *lp;
-	splitline *sp;
-	 int type, beats;
 	double t, vord;
 
-	while ((line = nextentry(bp)) != nil) {
-		sp = csvsplit(line, ",");
-		if (sp->nfield <= LNTYPE || sp->nfield > LNEFFECTS+1)
-			goto badline;
+	if (s == nil || lpp == nil)
+		return -1;
 
-		t = strtod(sp->fields[LNTIME], nil);
-		vord = strtod(sp->fields[LNVORD], nil);
-		beats = sfatoi(sp->fields[LNBEATS]);
-		type = sfatoi(sp->fields[LNTYPE]);
+	fields = ecalloc(maxrglinefields, sizeof(char *));
+	nfields = csvsplit(s, fields, maxrglinefields, ",");
+	if (nfields <= LNVOLUME || nfields > LNEFFECTS+1)
+		goto badline;
 
-		lp = mkrgline(t, vord, beats, type);
-		if ((lp = mkrgline(t, vord, beats, type)) == nil)
-			goto badline;
+	t = sfatod(fields[LNTIME]);
+	vord = sfatod(fields[LNVORD]);
+	beats = sfatod(fields[LNBEATS]);
+	type = (nfields > LNTYPE) ? sfatoi(fields[LNTYPE]) : RLINE;
 
-		lp->volume = sfatoi(sp->fields[LNVOLUME]);
-		lp->sampset = sfatoi(sp->fields[LNSAMPSET]);
-		lp->sampindex = sfatoi(sp->fields[LNSAMPINDEX]);
-		if (sp->nfield > LNEFFECTS) {
-			lp->kiai = sfatoi(sp->fields[LNEFFECTS]) & EBKIAI;
-			lp->omitbl = sfatoi(sp->fields[LNEFFECTS]) & EBOMIT;
-		}
+	if ((lp = mkrgline(t, vord, beats, type)) == nil)
+		goto badline;
 
-		bmp->rglines = addrglinet(bmp->rglines, lp);
-
-		nukesplitline(sp);
-		free(line);
+	lp->volume = sfatoi(fields[LNVOLUME]);
+	lp->sampset = sfatoi(fields[LNSAMPSET]);
+	lp->sampindex = sfatoi(fields[LNSAMPINDEX]);
+	if (nfields > LNEFFECTS) {
+		effects = sfatoi(fields[LNEFFECTS]);
+		lp->kiai = (effects & EBKIAI) > 0;
+		lp->omitbl = (effects & EBOMIT) > 0;
+		lp->effectbits = effects & ~(EBKIAI | EBOMIT);
 	}
 
+	free(fields);
+
+	*lpp = lp;
 	return 0;
 
 badline:
-	werrstr("malformed line: %s", line);
-	nukesplitline(sp);
-	free(line);
-	return BADLINE;
+	werrstr("malformed line definition");
+	free(fields);
+	return -1;
 }
 
-/* write all rglines in bmp->rglines to bp in a serialised form. */
-int
-wtimingpoints(beatmap *bmp, Biobuf *bp)
-{
-	rgline *np;
-	double vord;
-	int effects;
-
-	if (bmp->rglines == nil)
-		return 0;
-
-	Bprint(bp, "\r\n[TimingPoints]\r\n");
-	for (np = bmp->rglines; np != nil; np = np->next) {
-		vord = (np->type == GLINE) ? np->velocity : np->duration;
-		effects = np->omitbl | np->kiai;
-		Bprint(bp, "%.16G,%.16G,%d,%d,%d,%d,%d,%d\r\n", np->t, vord, np->beats, np->sampset, np->sampindex, np->volume, np->type, effects);
-	}
-
-	/* *two* cr-lfs follow [TimingPoints]. Why? Fuck you. */
-	Bprint(bp, "\r\n");
-
-	return 0;
-}
-
-/* read all entries from the [Colours] section, and add them tp
-  * table *bmp->colours. change each colour entry's type to long, and
-  * convert the r,g,b value string into a hex colour code.
-  * returns readentries' exit code. */
+/* create new anchors from the list in s, and add them to *alistpp
+  * returns 0 on success, -1 on failure.
+  * this routine sets errstr */
 static
 int
-rcolours(beatmap *bmp, Biobuf *bp)
+strtoanchlist(char *s, anchor **alistpp)
 {
-	int i, nspec, exit;
-	int r, g, b;
-	long hex;
-	entry *ep;
-	splitline *sp;
+	char **fields;
+	int nfields;
+	char **afields;
+	int anfields;
+	anchor *ap;
+	int i;
+	int x,y;
 
-	if (bmp->colours == nil)
-		bmp->colours = mktable(4);
+	if (s == nil || alistpp == nil)
+		return -1;
 
-	nspec = sizeof(fcolours) / sizeof(typespec);
-	exit = readentries(bmp->colours, bp, fcolours, nspec, 1);
-	if (exit < 0)
-		return exit;
+	nfields = csvcountf(s, "|");
+	fields = ecalloc(nfields, sizeof(char *));
+	csvsplit(s, fields, nfields, "|");
 
-	for (i = 0; i < nspec; i++) {
-		if ((ep = lookup(bmp->colours, fcolours[i].key)) == nil)
-			continue;
+	/* fields[0] contains curve type */
+	for (i = 1; i < nfields; i++) {
+		if ((anfields = csvcountf(fields[i], ":")) != 2)
+			goto badanchor;
 
-		sp = csvsplit(ep->s, ",");
-		r = sfatoi(sp->fields[RED]);
-		g = sfatoi(sp->fields[GREEN]);
-		b = sfatoi(sp->fields[BLUE]);
-		hex = ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | ((b & 0xFF) << 0);
-		free(ep->s);
-		ep->type = TLONG;
-		ep->l = hex;
-		nukesplitline(sp);
+		afields = ecalloc(anfields, sizeof(char *));
+		csvsplit(fields[i], afields, anfields, ":");
+
+		x = sfatoi(afields[X]);
+		y = sfatoi(afields[Y]);
+		free(afields);
+
+		if ((ap = mkanch(x, y)) == nil)
+			goto badanchor;
+		*alistpp = addanchn(*alistpp, ap, 0);
 	}
+	free(fields);
+	return i+1;
 
-	return 0;
+badanchor:
+	werrstr("bad anchor definition %s", fields[i]);
+	free(fields);
+	return -1;	
 }
 
-/* convert the hex colour longs in table *bmp->colours' entries
-  * colour longs back into r,g,b, and write them to bp.
-  * returns writeentries' exit code. */
+/* create new slider additions from the list in s, and add them to *sladdsp
+  * returns 0 on success, -1 on failure. */
 static
 int
-wcolours(beatmap *bmp, Biobuf *bp)
+strtosladds(char *s, int **sladdsp)
 {
-	int i, nspec;
-	char *c;
-	entry *ep;
+	char **fields;
+	int *sladds;
+	int nfields;
+	int i;
 
-	if (bmp->colours == nil)
-		return 0;
+	if (s == nil || sladdsp == nil)
+		return -1;
 
-	nspec = sizeof(fcolours) / sizeof(typespec);
-	for (i = 0; i < nspec; i++) {
-		if ((ep = lookup(bmp->colours, fcolours[i].key)) == nil)
-			continue;
+	nfields = csvcountf(s, "|");
 
-		c = smprint("%d,%d,%d", ep->l>>16, ep->l>>8 & 0xFF, ep->l & 0xFF);
-		ep->type = TSTRING;
-		ep->s = c;
-	}
+	sladds = ecalloc(nfields, sizeof(int *));
+	fields = ecalloc(nfields, sizeof(char *));
+	csvsplit(s, fields, nfields, "|");
 
-	Bprint(bp, "\r\n[Colours]\r\n");
-	return writeentries(bmp->colours, bp, fcolours, nspec);
+	for (i = 0; i < nfields; i++)
+		sladds[i] = sfatoi(fields[i]);
+	free(fields);
+
+	*sladdsp = sladds;
+	return nfields;
 }
 
-/* deserialise all [HitObjects] entries into rgline objects, and add
-  * them to list rline *bmp->rglines.
-  * returns 0 on success, or one of BADANCHOR, BADEDGESETS,
-  * BADOBJECT, or BADSAMPLE on .osu syntax errors.
-  * This routine sets errstr. */
+/* create new slider edge samplesets from the list in s, and add them to *slnormsetp
+  * and *sladdsetsp
+  * returns 0 on success, -1 on failure.
+  * this routine sets errstr */
 static
 int
-rhitobjects(beatmap *bmp, Biobuf *bp)
+strtoslsets(char *s, int **slnormsetsp, int **sladdsetsp)
 {
-	hitobject *op;
-	char *line;
-	splitline *sp, *curvessp, *curvesp, *esampsp, *esetssp, *esetsp, *hsampsp;
+	char **fields;
+	int nfields;
+	char **sfields;
+	int snfields;
+	int *slnormsets, *sladdsets;
+	int i;
+
+	if (s == nil || slnormsetsp == nil || sladdsetsp == nil)
+		return -1;
+
+	nfields = csvcountf(s, "|");
+	fields = ecalloc(nfields, sizeof(char *));
+	csvsplit(s, fields, nfields, "|");
+
+	slnormsets = ecalloc(nfields, sizeof(int));
+	sladdsets = ecalloc(nfields, sizeof(int));
+	for (i = 0; i < nfields; i++) {
+		snfields = csvcountf(fields[i], ":");
+		if (snfields != SLADDSET+1) {
+			werrstr("malformed edgeset definition %s'", fields[i]);
+			free(fields);
+			return -1;
+		}
+
+		sfields = ecalloc(snfields, sizeof(char *));
+		csvsplit(fields[i], sfields, snfields, ":");
+
+		slnormsets[i] = (snfields > SLNORMSET) ? sfatoi(sfields[SLNORMSET]) : 0;
+		sladdsets[i] = (snfields > SLADDSET) ? sfatoi(sfields[SLADDSET]) : 0;
+		free(sfields);
+	}
+	free(fields);
+
+	*slnormsetsp = slnormsets;
+	*sladdsetsp = sladdsets;
+
+	return nfields;
+}
+
+/* create a new hitsample from the sample definition in s, and assign it to *hspp
+  * returns 0 on success, -1 on failure.
+  * this routine sets errstr */
+static
+int
+strtohitsamp(char *s, hitsamp **hspp)
+{
+	char **fields;
+	int nfields;
+	hitsamp *hsp;
 	int normal, addition, index, volume;
 	Rune *file;
-	int x, y, typebits, type;
-	double t;
-	char *hitsamp;
-	int i;
 
-	while ((line = nextentry(bp)) != nil) {
-		sp = csvsplit(line, ",");
+	if (s == nil || hspp == nil)
+		return -1;
 
-		t = strtod(sp->fields[OBJTIME], nil);
-		x = atoi(sp->fields[OBJX]);
-		y = atoi(sp->fields[OBJY]);
-		typebits = atoi(sp->fields[OBJTYPE]);
-		type = typebits & TBTYPE;
+	fields = ecalloc(maxhitsampfields, sizeof(char *));
+	nfields = csvsplit(s, fields, maxhitsampfields, ":");
+	if (nfields  < HITSAMPINDEX || nfields > HITSAMPFILE+1)
+		goto badsamp;
 
-		op = mkobj(type, t, x, y);
+	normal = sfatoi(fields[HITSAMPNORMAL]);
+	addition = sfatoi(fields[HITSAMPADDITIONS]);
+	index = (nfields > HITSAMPINDEX) ? sfatoi(fields[HITSAMPINDEX]) : 0;
+	volume = (nfields > HITSAMPVOLUME) ? sfatoi(fields[HITSAMPVOLUME]) : 0;
+	file = (nfields > HITSAMPFILE) ? estrrunedup(fields[HITSAMPFILE]) : estrrunedup("");
 
-		switch (op->type) {
-		case TCIRCLE:
-			if (sp->nfield > OBJCIRCLEHITSAMP)
-				hitsamp = sp->fields[OBJCIRCLEHITSAMP];
+	free(fields);
+	if ((hsp = mkhitsamp(normal, addition, index, volume, file)) == nil)
+		goto badsamp;
 
-			break;
-		case TSLIDER:
-			op->slides = atoi(sp->fields[OBJSLIDES]);
-			op->length = strtod(sp->fields[OBJLENGTH], nil);
-
-			curvessp = csvsplit(sp->fields[OBJCURVES], "|");
-			op->curve = curvessp->fields[0][0];
-			for (i = 1; i < curvessp->nfield; i++) {
-				curvesp = csvsplit(curvessp->fields[i], ":");
-				if (curvesp->nfield != 2) {
-					werrstr("bad anchor #%d for object t=%ld: '%s'", i, op->t, curvessp->fields[i]);
-					nukesplitline(curvesp);
-					nukesplitline(curvessp);
-					nukeobj(op);
-					return BADANCHOR;
-				}
-
-				op->anchors = addanchn(op->anchors, mkanch(atoi(curvesp->fields[X]), atoi(curvesp->fields[Y])), 0);
-				nukesplitline(curvesp);
-			}
-			nukesplitline(curvessp);
-
-			/* the OBJEDGESOUNDS and OBJEDGESETS fields are OPTIONAL, and will be
-			  * MISSING if the slider has NO HITSOUNDS!!!
-			  *
-			  * I will pay $100 to the first person to slam a pie into peppy's face. */
-			if (sp->nfield > OBJEDGESOUNDS) {
-				esampsp = csvsplit(sp->fields[OBJEDGESOUNDS], "|");
-				op->nsladdition = esampsp->nfield;
-				op->sladditions = ecalloc(op->nsladdition, sizeof(int));
-				for (i = 0; i < op->nsladdition; i++)
-					op->sladditions[i] = atoi(esampsp->fields[i]);
-				nukesplitline(esampsp);
-			}
-
-			if (sp->nfield > OBJEDGESETS) {
-				esetssp = csvsplit(sp->fields[OBJEDGESETS], "|");
-				op->nsladdition = esetssp->nfield;
-				op->slnormalsets = ecalloc(op->nsladdition, sizeof(int));
-				op->sladditionsets = ecalloc(op->nsladdition, sizeof(int));
-				for (i = 0; i < op->nsladdition; i++) {
-					esetsp = csvsplit(esetssp->fields[i], ":");
-					if (esetsp->nfield != SLADDSET+1) {
-						werrstr("bad slider edgesets for object t=%ld: '%s'", i, op->t, esetssp->fields[i]);
-						nukesplitline(esetssp);
-						nukesplitline(esetsp);
-						nukeobj(op);
-						return BADEDGESETS;
-					}
-	
-					op->slnormalsets[i] = atoi(esetsp->fields[SLNORMSET]);
-					op->sladditionsets[i] = atoi(esetsp->fields[SLADDSET]);
-					nukesplitline(esetsp);
-				}
-				nukesplitline(esetssp);
-			}
-
-			if (sp->nfield > OBJSLIDERHITSAMP)
-				hitsamp = sp->fields[OBJSLIDERHITSAMP];
-
-			break;
-		case TSPINNER:
-			op->spinnerlength = strtod(sp->fields[OBJENDTIME], nil) - t;
-
-			if (sp->nfield > OBJSPINNERHITSAMP)
-				hitsamp = sp->fields[OBJSPINNERHITSAMP];
-
-			break;
-		default:
-			/* can't happen */
-			werrstr("bad type for object t=%ld: '%b'", op->t, op->type);
-			nukesplitline(sp);
-			free(line);
-			nukeobj(op);
-			return BADOBJECT;
-		}
-
-		op->additions = atoi(sp->fields[OBJADDITIONS]);
-		if (hitsamp != nil) {
-			hsampsp = csvsplit(hitsamp, ":");
-			if (hsampsp->nfield < HITSAMPINDEX || hsampsp->nfield > HITSAMPFILE+1) {
-				werrstr("malformed hitsample definition for object t=%ld: '%s'", op->t, hitsamp);
-				nukesplitline(hsampsp);
-				nukeobj(op);
-				return BADSAMPLE;
-			}
-
-			normal = atoi(hsampsp->fields[HITSAMPNORMAL]);
-			addition = atoi(hsampsp->fields[HITSAMPADDITIONS]);
-			index = (hsampsp->nfield > HITSAMPINDEX) ? atoi(hsampsp->fields[HITSAMPINDEX]) : -1;
-			volume = (hsampsp->nfield > HITSAMPVOLUME) ? atoi(hsampsp->fields[HITSAMPVOLUME]) : -1;
-			file = (hsampsp->nfield > HITSAMPFILE) ? estrrunedup(hsampsp->fields[HITSAMPFILE]) : nil;
-
-			op->samp = mkhitsample(normal, addition, index, volume, file);
-			nukesplitline(hsampsp);
-		}
-
-		if (typebits & TBNEWCOMBO) {
-			op->newcombo = 1;
-			op->comboskip = (typebits & TBCOLOR) >> TBCOLORSHIFT;
-		}
-
-		bmp->objects = addobjt(bmp->objects, op);
-		nukesplitline(sp);
-		free(line);
-		hitsamp = nil;
-	}
+	*hspp = hsp;
 
 	return 0;
+
+badsamp:
+	werrstr("malformed hitsample definition");
+	free(fields);
+	return -1;
 }
 
-/* write all objects in hitobject *bmp->objects to bp.
-  * returns 0 on success. */
+/* create a new hitobject from the object definition in s, and assign it to *opp
+  * returns 0 on success, -1 on failure.
+  * this routine sets errstr */
 static
 int
-whitobjects(beatmap *bmp, Biobuf *bp)
+strtoobj(char *s, hitobject **opp)
 {
-	int i;
+	char **fields;
+	int nfields;
 	hitobject *op;
-	anchor *ap;
-	int typebits;
+	int x, y, typebits, type;
+	double t;
 
-	Bprint(bp, "\r\n[HitObjects]\r\n");
+	if (s == nil || opp == nil)
+		return -1;
 
-	for (op = bmp->objects; op != nil; op = op->next) {
-		typebits = op->type;
-		if (op->newcombo == 1)
-			typebits |= TBNEWCOMBO | (op->comboskip << TBCOLORSHIFT);
+	fields = ecalloc(maxobjfields, sizeof(char *));
+	nfields = csvsplit(s, fields, maxobjfields, ",");
+	if (nfields < OBJADDITIONS)
+		return -1;
 
-		Bprint(bp, "%d,%d,%.16G,%d,%d", op->x, op->y, op->t, typebits, op->additions);
+	x = sfatoi(fields[OBJX]);
+	y = sfatoi(fields[OBJY]);
+	t = sfatod(fields[OBJTIME]);
+	typebits = sfatoi(fields[OBJTYPE]);
+	type = typebits & TBTYPE;
 
-		switch(op->type) {
-		case TCIRCLE:
-			break;
-		case TSLIDER:
-			Bprint(bp, ",%c", op->curve);
-			for (ap = op->anchors; ap != nil; ap = ap->next)
-				Bprint(bp, "|%d:%d", ap->x, ap->y);
+	if ((op = mkobj(type, t, x, y)) == nil)
+		return -1;
 
-			Bprint(bp, ",%d,%.16G", op->slides, op->length);
+	if ((typebits & TBNEWCOMBO) > 0) {
+		op->newcombo = 1;
+		op->comboskip = (typebits & TBCOLOR) >> TBCOLORSHIFT;
+	}
+	op->typebits = typebits & ~(TBTYPE|TBCOLOR|TBHOLD);
+	op->additions = sfatoi(fields[OBJADDITIONS]);
 
-			if (op->sladditions != nil) {
-				Bprint(bp, ",%d", op->sladditions[0]);
-				for (i = 1; i < op->nsladdition; i++)
-					Bprint(bp, "|%d", op->sladditions[i]);
-			}
+	switch (op->type) {
+	case TCIRCLE:
+		if (nfields > OBJCIRCLEHITSAMP)
+			if (strtohitsamp(fields[OBJCIRCLEHITSAMP], &op->hitsamp) < 0)
+				goto badstr;
 
-			if (op->slnormalsets != nil && op->sladditionsets != nil) {
-				Bprint(bp, ",%d:%d", op->slnormalsets[0], op->sladditionsets[0]);
-				for (i = 1; i < op->nsladdition; i++)
-					Bprint(bp, "|%d:%d", op->slnormalsets[i], op->sladditionsets[i]);
-			}
+		break;
+	case TSLIDER:
+		op->slides = sfatoi(fields[OBJSLIDES]);
+		op->length = sfatod(fields[OBJLENGTH]);
 
-			break;
-		case TSPINNER:
-			Bprint(bp, ",%.11G", op->t + op->spinnerlength);
+		op->curve = fields[OBJCURVES][0];
+		if (strtoanchlist(fields[OBJCURVES], &op->anchors) < 0)
+			goto badstr;
+		if (nfields > OBJEDGESOUNDS)
+			if ((op->nsladditions = strtosladds(fields[OBJEDGESOUNDS], &op->sladditions)) < 0)
+				goto badstr;
+		if (nfields > OBJEDGESETS)
+			if ((op->nslsets = strtoslsets(fields[OBJEDGESETS], &op->slnormalsets, &op->sladditionsets)) < 0)
+				goto badstr;
+		if (nfields > OBJSLIDERHITSAMP)
+			if (strtohitsamp(fields[OBJSLIDERHITSAMP], &op->hitsamp) < 0)
+				goto badstr;
 
-			break;
-		}
+		break;
+	case TSPINNER:
+		op->spinnerlength = sfatod(fields[OBJENDTIME]) - t;
+		if (nfields > OBJSPINNERHITSAMP)
+			if (strtohitsamp(fields[OBJSPINNERHITSAMP], &op->hitsamp) < 0)
+				goto badstr;
 
-		if (op->samp != nil) {
-			Bprint(bp, ",%d:%d", op->samp->normal, op->samp->addition);
-			if (op->samp->index >= 0)
-				Bprint(bp, ":%d", op->samp->index);
-			if (op->samp->volume >= 0)
-				Bprint(bp, ":%d", op->samp->volume);
-			if (op->samp->file != nil)
-				Bprint(bp, ":%S", op->samp->file);
-		}
-
-		Bprint(bp, "\r\n");
+		break;
+	default:
+		/* can't happen */
+		werrstr("bad type for object t=%ld: '%b'", op->t, op->type);
+		nukeobj(op);
+		return -1;
 	}
 
+	*opp = op;
+
+	free(fields);
 	return 0;
+
+badstr:
+	/* assume errstr was set by strto* method */
+	free(fields);
+	return -1;
 }
 
 /* create a new beatmap object */
@@ -1084,6 +790,12 @@ beatmap *
 mkbeatmap()
 {
 	beatmap *new = ecalloc(1, sizeof(beatmap));
+
+	new->general = mktable(8);
+	new->editor = mktable(8);
+	new->metadata = mktable(8);
+	new->difficulty = mktable(8);
+	new->colours = mktable(8);
 
 	return new;
 }
@@ -1118,48 +830,242 @@ nukebeatmap(beatmap *bmp)
 	free(bmp);
 }
 
-/* exhaust all sections in bp. for each section, call the corresponding
-  * .read handler in handlers[] with bmp and bp.
-  * returns any of the handlers' exit codes if they are nonzero, or zero
-  * on success */ 
+/* read a .osu file from bp, and deserialise all sections into the relevant
+  * bmp structs. this routine calls multiple subroutines that all set the errstr.
+  * returns 0 on success, negative values on failure. */
 int
-readmap(beatmap *bmp, Biobuf *bp)
+readmap(Biobuf *bp, beatmap *bmp)
 {
-	char *s;
-	int i;
-	int exit;
-	int nhandler = sizeof(handlers) / sizeof(handler);
+	char *s, *e;
+	table *tp;
+	entry *ep;
+	rgline *lp;
+	hitobject *op;
+	kvdef *kvlist;
+	int nkvlist;
+	int wstrip;
 
 	bmp->version = nextline(bp);
 
 	while ((s = nextsection(bp)) != nil) {
-		for (i = 0; i < nhandler; i++) {
-			if (strcmp(s, handlers[i].section) == 0)
-				if ((exit = handlers[i].read(bmp, bp)) < 0)
-					return exit;
+		if (strcmp(s, "[TimingPoints]") == 0) {
+			while ((e = nextentry(bp)) != nil) {
+				if (strtoline(e, &lp) < 0)
+					return -2;
+				bmp->rglines = addrglinet(bmp->rglines, lp);
+				free(e);
+			}
+
+			free(s);
+			continue;
+		} else if (strcmp(s, "[HitObjects]") == 0) {
+			while ((e = nextentry(bp)) != nil) {
+				if (strtoobj(e, &op) < 0)
+					return -2;
+				bmp->objects = addobjt(bmp->objects, op);
+				free(e);
+			}
+
+			free(s);
+			continue;
 		}
+
+		if (strcmp(s, "[Events]") == 0) {
+			bmp->events = readsection(bp);
+			free(s);
+			continue;
+		}
+
+		wstrip = 1;
+		if (strcmp(s, "[General]") == 0) {
+			tp =  bmp->general;
+			kvlist = kvgeneral;
+			nkvlist = nkvgeneral;
+		} else if (strcmp(s, "[Editor]") == 0) {
+			tp =  bmp->editor;
+			kvlist = kveditor;
+			nkvlist = nkveditor;
+		} else if (strcmp(s, "[Metadata]") == 0) {
+			tp =  bmp->metadata;
+			kvlist = kvmetadata;
+			nkvlist = nkvmetadata;
+			wstrip = 0;
+		} else if (strcmp(s, "[Difficulty]") == 0) {
+			tp =  bmp->difficulty;
+			kvlist = kvdifficulty;
+			nkvlist = nkvdifficulty;
+		} else if (strcmp(s, "[Colours]") == 0) {
+			tp =  bmp->colours;
+			kvlist = kvcolours;
+			nkvlist = nkvcolours;
+		} else {
+			werrstr("bad section %s", s);
+			free(s);
+			return -1;
+		}
+
+		while ((e = nextentry(bp)) != nil) {
+			if (strtoentry(e, &ep, kvlist, nkvlist, wstrip) < 0)
+				return -3;
+			addentry(tp, ep);
+			free(e);
+		}
+
 		free(s);
 	}
 
 	return 0;
 }
 
-/* call each .write handler in handlers[] with bmp and bp.
-  * returns any of the handlers' exit codes if they are nonzero, or zero
-  * on success */
+/* write all the entries in tp to bp, in the order in which they appear in kvlist
+  * returns 0 on success, negative values on failure */
+static
 int
-writemap(beatmap *bmp, Biobuf *bp)
+writeentries(Biobuf *bp, table *tp, kvdef *kvlist, int nkvlist)
+{
+	entry *ep;
+	int i;
+
+	if (tp == nil || bp == nil || kvlist == nil || nkvlist < 0)
+		return -1;
+
+	for (i = 0; i < nkvlist; i++) {
+		ep = lookup(tp, kvlist[i].key);
+		if (ep != nil) {
+			Bprint(bp, "\r\n");
+			switch(ep->type) {
+			case TRUNE:
+				Bprint(bp, kvlist[i].fmt, kvlist[i].key, ep->S);
+				break;
+			case TSTRING:
+				Bprint(bp, kvlist[i].fmt, kvlist[i].key, ep->s);
+				break;
+			case TINT:
+				Bprint(bp, kvlist[i].fmt, kvlist[i].key, ep->i);
+				break;
+			case TLONG:
+				Bprint(bp, kvlist[i].fmt, kvlist[i].key, ep->l);
+				break;
+			case TFLOAT:
+				Bprint(bp, kvlist[i].fmt, kvlist[i].key, ep->f);
+				break;
+			case TDOUBLE:
+				Bprint(bp, kvlist[i].fmt, kvlist[i].key, ep->d);
+				break;
+			}
+		}
+	}
+
+	return 0;
+}
+
+/* write all rglines from lines to bp
+  * returns 0 on success, -1 on failure */
+static
+int
+writerglines(Biobuf *bp, rgline *lines)
+{
+	rgline *np;
+	double vord;
+	int effects;
+
+	if (bp == nil || lines == nil)
+		return -1;
+
+	for (np = lines; np != nil; np = np->next) {
+		vord = (np->type == GLINE) ? np->velocity : np->duration;
+		effects = np->effectbits;
+		effects = (np->kiai > 0) ? effects | EBKIAI : effects & ~EBKIAI;
+		effects = (np->omitbl > 0) ? effects | EBOMIT : effects & ~EBOMIT;
+
+		Bprint(bp, "\r\n%.16G,%.16G,%d,%d,%d,%d,%d,%d", np->t, vord, np->beats, np->sampset, np->sampindex, np->volume, np->type, effects);
+	}
+
+	return 0;
+}
+
+/* write all hitobjects from objects to bp
+  * returns 0 on success, -1 on failure */
+static
+int
+writehitobjects(Biobuf *bp, hitobject *objects)
 {
 	int i;
-	int exit;
-	int nhandler = sizeof(handlers) / sizeof(handler);
+	hitobject *np;
+	anchor *ap;
+	int typebits;
 
+	if (bp == nil || objects == nil)
+		return -1;
+
+	for (np = objects; np != nil; np = np->next) {
+		Bprint(bp, "\r\n");
+		typebits = np->typebits | np->type;
+		if (np->newcombo > 0)
+			typebits |= TBNEWCOMBO | (np->comboskip << TBCOLORSHIFT);
+
+		Bprint(bp, "%d,%d,%.16G,%d,%d", np->x, np->y, np->t, typebits, np->additions);
+
+		switch(np->type) {
+		case TCIRCLE:
+			break;
+		case TSLIDER:
+			Bprint(bp, ",%c", np->curve);
+			for (ap = np->anchors; ap != nil; ap = ap->next)
+				Bprint(bp, "|%d:%d", ap->x, ap->y);
+
+			Bprint(bp, ",%d,%.16G", np->slides, np->length);
+
+			if (np->sladditions != nil) {
+				Bprint(bp, ",%d", np->sladditions[0]);
+				for (i = 1; i < np->nsladditions; i++)
+					Bprint(bp, "|%d", np->sladditions[i]);
+			}
+
+			if (np->slnormalsets != nil && np->sladditionsets != nil) {
+				Bprint(bp, ",%d:%d", np->slnormalsets[0], np->sladditionsets[0]);
+				for (i = 1; i < np->nslsets; i++)
+					Bprint(bp, "|%d:%d", np->slnormalsets[i], np->sladditionsets[i]);
+			}
+
+			break;
+		case TSPINNER:
+			Bprint(bp, ",%.11G", np->t + np->spinnerlength);
+
+			break;
+		}
+
+		if (np->hitsamp != nil) {
+			Bprint(bp, ",%d:%d:%d", np->hitsamp->normal, np->hitsamp->addition, np->hitsamp->index);
+			Bprint(bp, ":%d:%S", np->hitsamp->volume, np->hitsamp->file);
+		}
+	}
+
+	return 0;
+}
+
+/* write all sections to bp */
+int
+writemap(Biobuf *bp, beatmap *bmp)
+{
 	Bprint(bp, "%s\r\n", bmp->version);
 
-	for (i = 0; i < nhandler; i++) {
-		if ((exit = handlers[i].write(bmp, bp)) < 0)
-			return exit;
-	}
+	Bprint(bp, "\r\n[General]");
+	writeentries(bp, bmp->general, kvgeneral, nkvgeneral);
+	Bprint(bp, "\r\n\r\n[Editor]");
+	writeentries(bp, bmp->editor, kveditor, nkveditor);
+	Bprint(bp, "\r\n\r\n[Metadata]");
+	writeentries(bp, bmp->metadata, kvmetadata, nkvmetadata);
+	Bprint(bp, "\r\n\r\n[Difficulty]");
+	writeentries(bp, bmp->difficulty, kvdifficulty, nkvdifficulty);
+	Bprint(bp, "\r\n\r\n[Events]");
+	Bprint(bp, "\r\n%s", bmp->events);
+	Bprint(bp, "\r\n[TimingPoints]");
+	writerglines(bp, bmp->rglines);
+	Bprint(bp, "\r\n\r\n[Colours]");
+	writeentries(bp, bmp->colours, kvcolours, nkvcolours);
+	Bprint(bp, "\r\n\r\n[HitObjects]");
+	writehitobjects(bp, bmp->objects);
 
 	return 0;
 }

@@ -3,15 +3,15 @@
 #include "aux.h"
 #include "hitsound.h"
 
-hitsample *
-mkhitsample(int normal, int addition, int index, int volume, Rune *file)
+hitsamp *
+mkhitsamp(int normal, int addition, int index, int volume, Rune *file)
 {
-	hitsample *new;
+	hitsamp *new;
 
 	if (normal < SAMPDEFAULT || normal > SAMPDRUM || addition < SAMPDEFAULT || addition > SAMPDRUM)
 		return nil;
 
-	new = ecalloc(1, sizeof(hitsample));
+	new = ecalloc(1, sizeof(hitsamp));
 
 	new->normal = normal;
 	new->addition = addition;
@@ -23,7 +23,7 @@ mkhitsample(int normal, int addition, int index, int volume, Rune *file)
 }
 
 void
-nukehitsample(hitsample *hsp)
+nukehitsamp(hitsamp *hsp)
 {
 	if (hsp == nil)
 		return;

@@ -30,5 +30,5 @@ enum {
 
 beatmap *mkbeatmap();
 void nukebeatmap(beatmap *bmp);
-int readmap(beatmap *bmp, Biobuf *bp);
-int writemap(beatmap *bmp, Biobuf *bp);
+int readmap(Biobuf *bp, beatmap *bmp);
+int writemap(Biobuf *bp, beatmap *bmp);

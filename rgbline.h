@@ -19,6 +19,9 @@ typedef struct rgline {
 	int beats;		/* time signature in beats/4 */
 	int kiai;		/* kiai time enabled yes/no */
 	int omitbl;		/* omit first barline in osu!mania and taiko yes/no */
+	int effectbits;	/* remaining effect bits (older osu! maps) */
+				/* effectbits' kiai and omit barline bits are overridden
+				  * by kiai and omitbl on write */
 
 	int sampset;	/* sample set */
 	int sampindex;	/* custom sample index; 0 for default */

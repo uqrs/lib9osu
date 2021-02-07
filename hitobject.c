@@ -34,7 +34,7 @@ nukeobj(hitobject *op)
 	free(op->sladditions);
 	free(op->slnormalsets);
 	free(op->sladditionsets);
-	nukehitsample(op->samp);
+	nukehitsamp(op->hitsamp);
 
 	free(op);
 }

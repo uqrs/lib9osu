@@ -28,20 +28,23 @@ typedef struct hitobject {
 	double t;			/* timestamp in ms */
 	int x,y;			/* x and y positions in 'osu pixels' */
 	uchar type;		/* one of enum objtypes */
+	int typebits;		/* remaining type bits (old osu! beatmaps) */
+					/* typebit bits 0 through 7 will be overwritten by the values of type, newcombo,
+					  * and comboskip on write */
 	double length;		/* "visual length in osu! pixels." may be truncated with "no consequences". */
 
 	/* hitsampling */
 	int additions;		/* bit-flagged integer for additions. see hitsound.h:/additionbits/ */
 	int *sladditions;	/* additions for each slider edge hit */
+	int nsladditions;	/* number of elements in sladdition. Practically always slides+1 */
 	int *slnormalsets;	/* sample sets for each slider edge hit */
 	int *sladditionsets;	/* sample sets for additions for each slider edge hit */
-	int nsladdition;		/* number of elements in sladditions(ets). Practically always slides+1 */
-	hitsample *samp;	/* custom hitsample for object */
+	int nslsets;		/* number of elements in slnormalsets and sladditionsets. */
+	hitsamp *hitsamp;	/* custom hitsample for object */
 
 	/* colours */
 	int newcombo;		/* start new combo on this object */
 	int comboskip;		/* 'how many combo colours to skip' */
-
 
 	/* sliders */
 	int slides;			/* the amount of times this slider reverses +1 */

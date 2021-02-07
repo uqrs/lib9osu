@@ -13,14 +13,14 @@ enum additionbits {
 	ADBCLAP = 0x8,
 } additionbits;
 
-typedef struct hitsample hitsample;
-typedef struct hitsample {
+typedef struct hitsamp hitsamp;
+typedef struct hitsamp {
 	int normal;		/* sample set for the 'normal' sound */
 	int addition;		/* sample set for whistle, finish and clap sounds */
 	int index;			/* custom sample index; negative values indicate that no index was selected */
 	int volume;		/* sample volume percentage; negative values indicate that no volume was set */
 	Rune *file;			/* filename for custom addition sound; nil value indicates that hitsample definition had no 'file' field. */
-} hitsample;
+} hitsamp;
 
-hitsample *mkhitsample(int normal, int addition, int index, int volume, Rune *file);
-void nukehitsample(hitsample *hsp);
+hitsamp *mkhitsamp(int normal, int addition, int index, int volume, Rune *file);
+void nukehitsamp(hitsamp *hsp);
