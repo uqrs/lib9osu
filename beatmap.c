@@ -27,6 +27,7 @@ static kvdef kvgeneral[] = {
 	{.key = "AudioLeadIn", .fmt = "%s: %ld", .type = TLONG},
 	{.key = "PreviewTime", .fmt = "%s: %ld", .type = TLONG},
 	{.key = "Countdown", .fmt = "%s: %d", .type = TINT},
+	{.key = "CountdownOffset", .fmt = "%s: %d", .type = TINT},
 	{.key = "SampleSet", .fmt = "%s: %s", .type = TSTRING},
 	{.key = "StackLeniency", .fmt = "%s: %G", .type = TFLOAT},
 	{.key = "Mode", .fmt = "%s: %d", .type = TINT},
@@ -38,7 +39,6 @@ static kvdef kvgeneral[] = {
 	{.key = "OverlayPosition", .fmt = "%s: %s", .type = TSTRING},
 	{.key = "SkinPreference", .fmt = "%s:%s", .type = TSTRING},
 	{.key = "EpilepsyWarning", .fmt = "%s: %d", .type = TINT},
-	{.key = "CountdownOffset", .fmt = "%s: %d", .type = TINT},
 	{.key = "SpecialStyle", .fmt = "%s: %d", .type = TINT},
 	{.key = "WidescreenStoryboard", .fmt = "%s: %d", .type = TINT},
 	{.key = "SamplesMatchPlaybackRate", .fmt = "%s: %d", .type = TINT},
@@ -579,7 +579,7 @@ strtoanchlist(char *s, anchor **alistpp)
 badanchor:
 	werrstr("bad anchor definition %s", fields[i]);
 	free(fields);
-	return -1;	
+	return -1;
 }
 
 /* create new slider additions from the list in s, and add them to *sladdsp
@@ -728,11 +728,11 @@ strtoobj(char *s, hitobject **opp)
 	if ((op = mkobj(type, t, x, y)) == nil)
 		return -1;
 
-	if ((typebits & TBNEWCOMBO) > 0) {
-		op->newcombo = 1;
-		op->comboskip = (typebits & TBCOLOR) >> TBCOLORSHIFT;
-	}
-	op->typebits = typebits & ~(TBTYPE|TBCOLOR|TBHOLD);
+	if ((typebits & TBNEWCOMBO) > 0)
+	op->newcombo = (typebits & TBNEWCOMBO) > 0 ? 1 : 0;
+	op->comboskip = (typebits & TBCOLOR) >> TBCOLORSHIFT;
+
+	op->typebits = typebits & ~(TBTYPE|TBCOLOR|TBNEWCOMBO|TBHOLD);
 	op->additions = sfatoi(fields[OBJADDITIONS]);
 
 	switch (op->type) {
@@ -1000,9 +1000,9 @@ writehitobjects(Biobuf *bp, hitobject *objects)
 
 	for (np = objects; np != nil; np = np->next) {
 		Bprint(bp, "\r\n");
-		typebits = np->typebits | np->type;
+		typebits = np->typebits | np->type | (np->comboskip << TBCOLORSHIFT);
 		if (np->newcombo > 0)
-			typebits |= TBNEWCOMBO | (np->comboskip << TBCOLORSHIFT);
+			typebits |= TBNEWCOMBO;
 
 		Bprint(bp, "%d,%d,%.16G,%d,%d", np->x, np->y, np->t, typebits, np->additions);
 
@@ -1050,22 +1050,38 @@ writemap(Biobuf *bp, beatmap *bmp)
 {
 	Bprint(bp, "%s\r\n", bmp->version);
 
-	Bprint(bp, "\r\n[General]");
-	writeentries(bp, bmp->general, kvgeneral, nkvgeneral);
-	Bprint(bp, "\r\n\r\n[Editor]");
-	writeentries(bp, bmp->editor, kveditor, nkveditor);
-	Bprint(bp, "\r\n\r\n[Metadata]");
-	writeentries(bp, bmp->metadata, kvmetadata, nkvmetadata);
-	Bprint(bp, "\r\n\r\n[Difficulty]");
-	writeentries(bp, bmp->difficulty, kvdifficulty, nkvdifficulty);
-	Bprint(bp, "\r\n\r\n[Events]");
-	Bprint(bp, "\r\n%s", bmp->events);
-	Bprint(bp, "\r\n[TimingPoints]");
-	writerglines(bp, bmp->rglines);
-	Bprint(bp, "\r\n\r\n[Colours]");
-	writeentries(bp, bmp->colours, kvcolours, nkvcolours);
-	Bprint(bp, "\r\n\r\n[HitObjects]");
-	writehitobjects(bp, bmp->objects);
+	if (bmp->general->nentry > 0) {
+		Bprint(bp, "\r\n[General]");
+		writeentries(bp, bmp->general, kvgeneral, nkvgeneral);
+	}
+	 if (bmp->editor->nentry > 0) {
+		Bprint(bp, "\r\n\r\n[Editor]");
+		writeentries(bp, bmp->editor, kveditor, nkveditor);
+	}
+	if (bmp->metadata->nentry > 0) {
+		Bprint(bp, "\r\n\r\n[Metadata]");
+		writeentries(bp, bmp->metadata, kvmetadata, nkvmetadata);
+	}
+	if (bmp->difficulty->nentry > 0) {
+		Bprint(bp, "\r\n\r\n[Difficulty]");
+		writeentries(bp, bmp->difficulty, kvdifficulty, nkvdifficulty);
+	}
+	if (bmp->events != nil) {
+		Bprint(bp, "\r\n\r\n[Events]");
+		Bprint(bp, "\r\n%s", bmp->events);
+	}
+	if (bmp->rglines != nil) {
+		Bprint(bp, "\r\n[TimingPoints]");
+		writerglines(bp, bmp->rglines);
+	}
+	if (bmp->colours->nentry > 0) {
+		Bprint(bp, "\r\n\r\n[Colours]");
+		writeentries(bp, bmp->colours, kvcolours, nkvcolours);
+	}
+	if (bmp->objects != nil) {
+		Bprint(bp, "\r\n\r\n[HitObjects]");
+		writehitobjects(bp, bmp->objects);
+	}
 
 	return 0;
 }
