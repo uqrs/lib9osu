@@ -13,13 +13,13 @@ diff outp.osu example/destrier.osu
 ./test example/
 ```
 Test cases can be found at: https://data.ppy.sh/
-This revision has been tested against:
+This revision has been tested against:  
 - 2021_01_01_osu_files.tar.bz2 (only osu!std maps; i.e. any map where "Mode" is "0")
 
 verify.awk verifies the semantic contents of beatmaps. It does not catch:
-	- red/green lines with identical timestamps being written back in a different order
-	- 2B being written back in a different order
-	- shitposters hiding easter eggs in their mapsets
+- red/green lines with identical timestamps being written back in a different order
+- 2B being written back in a different order
+- shitposters hiding easter eggs in their mapsets
 These maps will require manual intervention, at least until verify.awk has been modified to account for these.
 
 ## What has been done?
