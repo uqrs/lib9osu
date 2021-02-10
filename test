@@ -1,0 +1,66 @@
+#!/usr/bin/env rc
+# this test script is not going to work on plan9
+# it depends on GNU/diff and gawk. oops
+prog=`{echo $0 | xargs basename}
+n=0;
+pass=0;
+fail=0;
+
+if (~ $1 '') {
+	echo 'usage: '$prog' directory/' >[1=2]
+	exit 1
+}
+
+if (! test -d $1) {
+	echo 'not a directory '$1 >[1=2]
+	exit 1
+}
+
+for (file in `{ls $1}) {
+	n=`{echo $n' + 1' | bc}
+
+	./osu9 $file >outp.osu
+	s=$status;
+	if (! ~ $s '') {
+		fail=`{echo $fail' + 1' | bc}
+		echo $file': status '$s
+		cat outp.osu
+		key=`{read}
+		if (~ $key 'q') {
+			echo 'tested '$n' maps'
+			exit 0
+		}
+	}
+
+	out=`{/usr/bin/diff -ZB $file outp.osu}
+	if (! ~ $out '') {
+		echo -n 'semantic verification necessary for '$file' ... '
+		vout=`{cat $file | gawk -v cmp=outp.osu -f verify.awk}
+
+		if (! ~ $vout '') {
+			echo 'fail'
+			fail=`{echo $fail' + 1' | bc}
+			echo 'in '$file
+			cat $file | gawk -v cmp=outp.osu -f verify.awk # no, really.
+
+			key=`{read}
+			if (~ $key 'q') {
+				echo 'tested '$n' maps'
+				exit 0
+			}
+		}
+		if not {
+			echo 'pass'
+			pass=`{echo $pass' + 1' | bc}
+		}
+	}
+	if not {
+		pass=`{echo $pass' + 1' | bc}
+	}
+}
+
+echo 'tested '$n' maps'
+echo $pass' pass'
+echo $fail' fail'
+rm outp.osu
+exit 0

@@ -257,11 +257,12 @@ nextsection(Biobuf *bp)
 	return nil;
 }
 
-/* read the next line from bp, and return it, skipping empty lines.
+/* read the next configuration directive from bp, and
+  * return it, skipping empty lines.
   * returns nil at the next section header, or end-of-file. */
 static
 char *
-nextentry(Biobuf *bp)
+nextdirective(Biobuf *bp)
 {
 	char *ln;
 
@@ -295,7 +296,7 @@ readsection(Biobuf *bp)
 	maxchar = 256;
 	section = ecalloc(maxchar, sizeof(char));
 
-	while ((ln = nextentry(bp)) != nil) {
+	while ((ln = nextdirective(bp)) != nil) {
 		len = strlen(ln);
 
 		/* + 2 for carriage return and newline */
@@ -448,10 +449,13 @@ lookupkvdef(kvdef *kvlist, int nkvlist, char *k)
 	return nil;
 }
 
-/* create a new entry object from s, and assigns it to *epp.
+/* create a new entry object from s with the respective .type enum
+  * from kvlist. If the key does not appear in kvlist, then the entry's
+  * type defaults to TSTRING.
   * if wstrip is non-zero, strip whitespace around the delimiter
   * returns 0 on success, -1 on failure.
-  * this routine sets errstr */
+  * this routine sets errstr 
+  * sample input: 'AudioFilename: audio.mp3' */
 static
 int
 strtoentry(char *s, entry **epp, kvdef *kvlist, int nkvlist, int wstrip)
@@ -459,6 +463,7 @@ strtoentry(char *s, entry **epp, kvdef *kvlist, int nkvlist, int wstrip)
 	char **fields;
 	entry *ep;
 	kvdef *kvdefp;
+	int type;
 
 	if (s == nil || epp == nil || kvlist == nil || nkvlist <= 0 || wstrip < 0)
 		return -1;
@@ -467,13 +472,9 @@ strtoentry(char *s, entry **epp, kvdef *kvlist, int nkvlist, int wstrip)
 	kvsplit(s, fields, maxkvfields, ":", wstrip);
 
 	kvdefp = lookupkvdef(kvlist, nkvlist, fields[KEY]);
-	if (kvdefp == nil) {
-		werrstr("unknown configuration key %s", fields[KEY]);
-		free(fields);
-		return -1;
-	}
+	type = (kvdefp != nil) ? kvdefp->type : TSTRING;
 
-	if ((ep = mkentry(fields[KEY], fields[VALUE], kvdefp->type)) == nil) {
+	if ((ep = mkentry(fields[KEY], fields[VALUE], type)) == nil) {
 		werrstr("malformed keyval definition");
 		free(fields);
 		return -1;
@@ -684,10 +685,10 @@ strtohitsamp(char *s, hitsamp **hspp)
 	volume = (nfields > HITSAMPVOLUME) ? sfatoi(fields[HITSAMPVOLUME]) : 0;
 	file = (nfields > HITSAMPFILE) ? estrrunedup(fields[HITSAMPFILE]) : estrrunedup("");
 
-	free(fields);
 	if ((hsp = mkhitsamp(normal, addition, index, volume, file)) == nil)
 		goto badsamp;
 
+	free(fields);
 	*hspp = hsp;
 
 	return 0;
@@ -722,6 +723,7 @@ strtoobj(char *s, hitobject **opp)
 	x = sfatoi(fields[OBJX]);
 	y = sfatoi(fields[OBJY]);
 	t = sfatod(fields[OBJTIME]);
+
 	typebits = sfatoi(fields[OBJTYPE]);
 	type = typebits & TBTYPE;
 
@@ -849,7 +851,7 @@ readmap(Biobuf *bp, beatmap *bmp)
 
 	while ((s = nextsection(bp)) != nil) {
 		if (strcmp(s, "[TimingPoints]") == 0) {
-			while ((e = nextentry(bp)) != nil) {
+			while ((e = nextdirective(bp)) != nil) {
 				if (strtoline(e, &lp) < 0)
 					return -2;
 				bmp->rglines = addrglinet(bmp->rglines, lp);
@@ -859,7 +861,7 @@ readmap(Biobuf *bp, beatmap *bmp)
 			free(s);
 			continue;
 		} else if (strcmp(s, "[HitObjects]") == 0) {
-			while ((e = nextentry(bp)) != nil) {
+			while ((e = nextdirective(bp)) != nil) {
 				if (strtoobj(e, &op) < 0)
 					return -2;
 				bmp->objects = addobjt(bmp->objects, op);
@@ -904,7 +906,7 @@ readmap(Biobuf *bp, beatmap *bmp)
 			return -1;
 		}
 
-		while ((e = nextentry(bp)) != nil) {
+		while ((e = nextdirective(bp)) != nil) {
 			if (strtoentry(e, &ep, kvlist, nkvlist, wstrip) < 0)
 				return -3;
 			addentry(tp, ep);
@@ -917,20 +919,24 @@ readmap(Biobuf *bp, beatmap *bmp)
 	return 0;
 }
 
-/* write all the entries in tp to bp, in the order in which they appear in kvlist
+/* first write all tp entries listed in kvlist to bp, before writing
+  * all remaining entries that do not appear in kvlist. writeentries
+  * assumes that all entries not in kvlist have the type TSTRING.
   * returns 0 on success, negative values on failure */
 static
 int
 writeentries(Biobuf *bp, table *tp, kvdef *kvlist, int nkvlist)
 {
+	entry **written;
 	entry *ep;
-	int i;
+	int i, n, found;
 
 	if (tp == nil || bp == nil || kvlist == nil || nkvlist < 0)
 		return -1;
 
-	for (i = 0; i < nkvlist; i++) {
-		ep = lookup(tp, kvlist[i].key);
+	written = ecalloc(tp->nentry, sizeof(entry *));
+	for (i = 0, n = 0; i < nkvlist; i++) {
+		ep = lookupentry(tp, kvlist[i].key);
 		if (ep != nil) {
 			Bprint(bp, "\r\n");
 			switch(ep->type) {
@@ -953,9 +959,34 @@ writeentries(Biobuf *bp, table *tp, kvdef *kvlist, int nkvlist)
 				Bprint(bp, kvlist[i].fmt, kvlist[i].key, ep->d);
 				break;
 			}
+			written[n++] = ep;
 		}
 	}
 
+	if (n == tp->nentry) {
+		free(written);
+		return 0;
+	}
+
+	for (ep = nextentry(tp, nil), found = 0; ep != nil; ep = nextentry(tp, ep), found = 0) {
+		for (i = 0; i < n; i++) {
+			if (written[i] == ep) {
+				found = 1;
+				break;
+			}
+		}
+
+		if (found == 0) {
+			if (ep->type != TSTRING) {
+				werrstr("unknown key %s does not have type TSTRING");
+				free(written);
+				return -1;
+			}
+			Bprint(bp, "\r\n%s: %s", ep->key, ep->s);
+		}
+	}
+
+	free(written);
 	return 0;
 }
 

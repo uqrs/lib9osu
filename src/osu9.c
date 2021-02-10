@@ -14,41 +14,27 @@
 void
 main(int argc, char *argv[])
 {
-	hitobject *op;
-	anchor *ap;
-	int n;
+	beatmap *bmp;
 	Biobuf *bfile, *boutfile;
+
+	if (argc < 2) {
+		fprint(2, "usage: %s file.osu\n", argv[0]);
+		exits("usage");
+	}
 
 	bfile = Bopen(argv[1], OREAD);
 	if (bfile == nil) {
-		print("You fucked up: %r\n");
+		fprint(2, "%r\n");
 		exits("Bopen");
 	}
-	beatmap *bmp = mkbeatmap();
+	
+	bmp = mkbeatmap();
 	if (readmap(bfile, bmp) < 0) {
 		Bterm(bfile);
-		print("%r\n");
-		exits("Fuck.");
+		fprint(2, "%r\n");
+		exits("readmap");
 	}
 	Bterm(bfile);
-/*
-	print("%S\n", lookup(bmp->general, "AudioFilename")->S);
-	print("\n%s\n", bmp->events);
-
-	for (op = bmp->objects; op != nil; op = op->next) {
-		if (op->type == TSLIDER) {
-			n = 0;
-			for (ap = op->anchors; ap != nil; ap = ap->next, n++)
-				;
-			if (n > 4) {
-				print("t=%.15G (%d,%d) anch:", op->t, op->x, op->y);
-				for (ap = op->anchors; ap != nil; ap = ap->next, n++) {
-					print(" %d:%d", ap->x, ap->y);
-				}
-				print("\n");
-			}
-		}
-	}*/
 
 	boutfile = ecalloc(1, sizeof(Biobuf));
 	Binit(boutfile, 1, OWRITE);

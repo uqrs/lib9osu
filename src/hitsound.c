@@ -8,9 +8,6 @@ mkhitsamp(int normal, int addition, int index, int volume, Rune *file)
 {
 	hitsamp *new;
 
-	if (normal < SAMPDEFAULT || normal > SAMPDRUM || addition < SAMPDEFAULT || addition > SAMPDRUM)
-		return nil;
-
 	new = ecalloc(1, sizeof(hitsamp));
 
 	new->normal = normal;

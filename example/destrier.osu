@@ -20,10 +20,10 @@ TimelineZoom: 2.800005
 
 [Metadata]
 Title:Dark Water
-TitleUnicode:私はガラスを食べられます。≤それは私を傷つけません。
+TitleUnicode:Dark Water
 Artist:Agent Fresco
-ArtistUnicode:我能吞下玻璃而不傷身體。
-Creator:G:o:d:o:t
+ArtistUnicode:Agent Fresco
+Creator:Godot
 Version:Destrier
 Source:
 Tags:agent fresco destrier dark water progmetal progrock rock prog metal progressive
@@ -31,10 +31,10 @@ BeatmapID:1618950
 BeatmapSetID:761140
 
 [Difficulty]
-HPDrainRate:6.2
-CircleSize:4.1
-OverallDifficulty:8.2
-ApproachRate:8.5
+HPDrainRate:6
+CircleSize:4
+OverallDifficulty:8
+ApproachRate:9
 SliderMultiplier:2.8
 SliderTickRate:1
 
