@@ -1,6 +1,4 @@
-# osufs
-osu! beatmap 9p server
-
+# lib9osu
 Built with p9p. Has not been tested on an actual plan9 machine.
 A small sample of test cases has been provided in example/
 ```
@@ -30,7 +28,6 @@ These maps will require manual intervention, at least until verify.awk has been 
 ## What has yet to be done?
 - Additional functions for traversing the lists & manipulating object/timing point data
 - Functions for calculating visual slider length
-- The actual 9p server itself.
 
 ## Quirks
 - osu!mania, osu!taiko, and osu!catch are not supported.
