@@ -48,6 +48,7 @@ addrglinet(rgline *listp, rgline *lp)
 
 	if (lp == nil || lp->type < GLINE || lp->type > RLINE)
 		return nil;
+
 	if (listp == nil)
 		return lp;
 
@@ -95,9 +96,7 @@ rmrgline(rgline *listp, rgline *lp)
 {
 	rgline *np, *newlistp;
 
-	if (listp == nil) {
-		return nil;
-	} else if (listp == lp) {
+	if (listp == lp) {
 		newlistp = listp->next;
 		listp->next = nil;
 		return newlistp;

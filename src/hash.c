@@ -105,6 +105,9 @@ hash(char *s, int n)
 	uint h;
 	uchar *p;
 
+	if (s == nil)
+		return -1;
+
 	h = 0;
 	for (p = (uchar *) s; *p != '\0'; p++)
 		h = mult * h + *p;

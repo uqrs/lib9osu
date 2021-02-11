@@ -8,7 +8,7 @@
   *
   * returns a Rune string containing only Runeerror if the NULL character
   * occurs in the middle of a UTF sequence. This  sets the error string,
-  * and the return value must still be free()d afterwards. */
+  * and the return value must still be freed afterwards. */
 Rune *
 strrunedup(char *s)
 {

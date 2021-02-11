@@ -26,6 +26,10 @@ void
 nukeobj(hitobject *op)
 {
 	anchor *ap, *next;
+
+	if (op == nil)
+		return;
+
 	for (ap = op->anchors; ap != nil; ap = next) {
 		next = ap->next;
 		free(ap);
@@ -45,6 +49,9 @@ hitobject *
 addobjt(hitobject *listp, hitobject *op)
 {
 	hitobject *np;
+
+	if (op == nil)
+		return nil;
 
 	if (listp == nil)
 		return op;
@@ -78,8 +85,12 @@ addobjt(hitobject *listp, hitobject *op)
 hitobject *
 moveobjt(hitobject *listp, hitobject *op, double t)
 {
+	if (listp == nil || op == nil)
+		return nil;
+
 	listp = rmobj(listp, op);
 	op->t = t;
+
 	return addobjt(listp, op);
 }
 
@@ -89,9 +100,10 @@ rmobj(hitobject *listp, hitobject *op)
 {
 	hitobject *np, *newlistp;
 
-	if (listp == nil) {
+	if (listp == nil)
 		return nil;
-	} else if (listp == op) {
+
+	if (listp == op) {
 		newlistp = listp->next;
 		listp->next = nil;
 		return newlistp;
@@ -105,7 +117,7 @@ rmobj(hitobject *listp, hitobject *op)
 		}
 	}
 
-	return nil; /* unreachable */ 
+	return nil; /* unreachable */
 }
 
 /* returns a pointer to an object with time t in listp.
@@ -115,6 +127,7 @@ hitobject *
 lookupobjt(hitobject *listp, double t)
 {
 	hitobject *np;
+
 	if (listp == nil)
 		return nil;
 
@@ -133,7 +146,10 @@ hitobject *
 lookupobjn(hitobject *listp, uint n)
 {
 	hitobject *np;
-	int i = 0;
+	int i;
+
+	if (listp == nil || n < 0)
+		return nil;
 
 	if (n == 0) {
 		for (np = listp; np->next != nil; np = np->next)
@@ -142,10 +158,9 @@ lookupobjn(hitobject *listp, uint n)
 		return np;
 	}
 
-	for (np = listp; np != nil; np = np->next) {
+	for (np = listp, i = 0; np != nil; np = np->next)
 		if (++i == n)
 			return np;
-	}
 
 	return nil;
 }
@@ -154,8 +169,9 @@ lookupobjn(hitobject *listp, uint n)
 anchor *
 mkanch(int x, int y)
 {
-	anchor *new = (anchor *) ecalloc(1, sizeof(anchor));
+	anchor *new;
 
+	new = ecalloc(1, sizeof(anchor));
 	new->x = x;
 	new->y = y;
 	new->next = nil;
@@ -171,6 +187,9 @@ addanchn(anchor *alistp, anchor *ap, uint n)
 {
 	anchor *np;
 	int i;
+
+	if (n < 0)
+		return nil;
 
 	if (alistp == nil)
 		return ap;
