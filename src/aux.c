@@ -100,30 +100,3 @@ estrdup(char *s)
 		sysfatal("out of memory\n");
 	return new;
 }
-
-float
-sfatof(char *s)
-{
-	if (s == nil)
-		return 0;
-
-	return atof(s);
-}
-
-int
-sfatoi(char *s)
-{
-	if (s == nil)
-		return 0;
-
-	return atof(s);
-}
-
-double
-sfatod(char *s)
-{
-	if (s == nil)
-		return 0;
-
-	return strtod(s, nil);
-}
