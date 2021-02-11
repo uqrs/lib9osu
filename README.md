@@ -1,6 +1,4 @@
-# osufs
-osu! beatmap 9p server
-
+# lib9osu
 Built with p9p. Has not been tested on an actual plan9 machine.
 A small sample of test cases has been provided in example/
 ```
@@ -13,13 +11,13 @@ diff outp.osu example/destrier.osu
 ./test example/
 ```
 Test cases can be found at: https://data.ppy.sh/
-This revision has been tested against:
+This revision has been tested against:  
 - 2021_01_01_osu_files.tar.bz2 (only osu!std maps; i.e. any map where "Mode" is "0")
 
 verify.awk verifies the semantic contents of beatmaps. It does not catch:
-	- red/green lines with identical timestamps being written back in a different order
-	- 2B being written back in a different order
-	- shitposters hiding easter eggs in their mapsets
+- red/green lines with identical timestamps being written back in a different order
+- 2B being written back in a different order
+- shitposters hiding easter eggs in their mapsets
 These maps will require manual intervention, at least until verify.awk has been modified to account for these.
 
 ## What has been done?
@@ -30,7 +28,6 @@ These maps will require manual intervention, at least until verify.awk has been 
 ## What has yet to be done?
 - Additional functions for traversing the lists & manipulating object/timing point data
 - Functions for calculating visual slider length
-- The actual 9p server itself.
 
 ## Quirks
 - osu!mania, osu!taiko, and osu!catch are not supported.
