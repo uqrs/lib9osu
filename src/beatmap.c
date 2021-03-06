@@ -751,7 +751,7 @@ strtoobj(char *s, hitobject **opp)
 	op->typebits = typebits & ~(TBTYPE|TBCOLOR|TBNEWCOMBO|TBHOLD);
 
 	op->additions = atoi(fields[OBJADDITIONS]);
-	op->newcombo = (typebits & TBNEWCOMBO) > 0 ? 1 : 0;
+	op->newcombo = (typebits & TBNEWCOMBO) > 0;
 	op->comboskip = (typebits & TBCOLOR) >> TBCOLORSHIFT;
 
 	switch (op->type) {

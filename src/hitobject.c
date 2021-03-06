@@ -1,5 +1,6 @@
 #include <u.h>
 #include <libc.h>
+#include <stdio.h>
 #include "aux.h"
 #include "hitsound.h"
 #include "hitobject.h"
@@ -163,6 +164,40 @@ lookupobjn(hitobject *listp, uint n)
 			return np;
 
 	return nil;
+}
+
+/* returns a pointer to the object in listp
+  * corresponding to the timestamp in s.
+  * writes the number of selected objects to
+  * selected, if it is not nil.
+  * sample input:
+  * 00:00:880 (1,1,2,3,1,2,3,4,1)
+  */
+hitobject *
+lookupobjstr(hitobject *listp, int *selected, char *s)
+{
+	hitobject *op;
+	char *objstr, *p;
+	int nmins, nsec, nms, t;
+
+	if (listp == nil || s == nil)
+		return nil;
+
+	objstr = ecalloc(256, sizeof(char));
+	nmins = nsec = nms = 0;
+
+	if (sscanf(s, "%d:%d:%d %s", &nmins, &nsec, &nms, objstr) < 4)
+		return nil;
+
+	if (selected != nil)
+		for (p = objstr; *p != '\0'; p++)
+			if (*p == ',' || *p == ')')
+				*selected += 1;
+
+	t = nms + 1000*(nmins*60 + nsec);
+	op = lookupobjt(listp, t);
+
+	return (op->t >= t) ? op : op->next;
 }
 
 /* creates a new anchor */

@@ -112,3 +112,24 @@ rmrgline(rgline *listp, rgline *lp)
 
 	return nil; /* unreachable */
 }
+
+/* returns a pointer to the last rgline in listp whose time value
+  * is equal to or less than t with a matching type */
+rgline *
+lookuprglinet(rgline *listp, double t, int type)
+{
+	rgline *np, *found;
+
+	if (type < GLINE || type > RLINE)
+		return nil;
+
+	found = nil;
+	for (np = listp; np != nil; np = np->next) {
+		if (np->type == type && np->t <= t)
+			found = np;
+		else if (np->t > t)
+			break;
+	}
+
+	return found;
+}

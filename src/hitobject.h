@@ -62,5 +62,6 @@ hitobject *moveobjt(hitobject *listp, hitobject *op, double t);
 hitobject *rmobj(hitobject *listp, hitobject *op);
 hitobject *lookupobjt(hitobject *listp, double t);
 hitobject *lookupobjn(hitobject *listp, uint n);
+hitobject *lookupobjstr(hitobject *listp, int *selected, char *s);
 anchor *mkanch(int x, int y);
 anchor *addanchn(anchor *alistp, anchor *ap, uint n);

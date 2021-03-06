@@ -29,8 +29,9 @@ typedef struct rgline {
 
 } line;
 
-line *mkrgline(double t, double vord, int beats, int type);
+rgline *mkrgline(double t, double vord, int beats, int type);
 void nukergline(rgline *lp);
-line *addrglinet(rgline *listp, rgline *lp);
-line *moverglinet(rgline *listp, rgline *lp, double t);
-line *rmrgline(rgline *listp, rgline *lp);
+rgline *addrglinet(rgline *listp, rgline *lp);
+rgline *moverglinet(rgline *listp, rgline *lp, double t);
+rgline *rmrgline(rgline *listp, rgline *lp);
+rgline *lookuprglinet(rgline *listp, double t, int type);

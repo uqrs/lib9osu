@@ -6,8 +6,8 @@ LD=9l
 
 osu9:Q:	src/
 	cd src/
-	9c -c osu9.c hitobject.c rgbline.c beatmap.c aux.c hash.c hitsound.c
-	9l -o osu9 osu9.o hitobject.o rgbline.o beatmap.o aux.o hash.o hitsound.o
+	9c -c osu9.c hitobject.c rgbline.c beatmap.c aux.c hash.c hitsound.c timeline.c
+	9l -o osu9 osu9.o hitobject.o rgbline.o beatmap.o aux.o hash.o hitsound.o timeline.o
 	mv osu9 ../
 nuke:
 	cd src/
