@@ -2,8 +2,6 @@
 #include <libc.h>
 #include <bio.h>
 #include <fcall.h>
-#include <thread.h>
-#include <9p.h>
 #include "aux.h"
 #include "hash.h"
 #include "rgbline.h"
@@ -135,18 +133,17 @@ main(int argc, char *argv[])
 	}
 	Bterm(bfile);
 
-	int nanchors;
-	anchor *ap;
 	hitobject *op;
+	rgline *rlp;
+
+	rlp = lookuprglinet(bmp->rglines, bmp->objects->t, RLINE);
+	if (rlp == nil)
+		print("Nil\'n");
 
 	for (op = bmp->objects; op != nil; op = op->next) {
-		nanchors = 0;
-		for (ap = op->anchors; ap != nil; ap = ap->next)
-			nanchors++;
-
-		print("%G\n", bezierlen(op->anchors, nanchors));
+		bmp->objects = moveobjt(bmp->objects, op, op->t + 20);
+		op->newcombo = 1;
 	}
-	exits(0);
 
 	boutfile = ecalloc(1, sizeof(Biobuf));
 	Binit(boutfile, 1, OWRITE);
@@ -155,5 +152,4 @@ main(int argc, char *argv[])
 	Bterm(boutfile);
 	nukebeatmap(bmp);
 
-	exits(0);
 }
