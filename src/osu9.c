@@ -75,35 +75,14 @@ doncspam(beatmap *bmp, char *s)
 	return 0;
 }
 
-void
-main(int argc, char *argv[])
+int
+dospiral(beatmap *bmp)
 {
-	beatmap *bmp;
-	Biobuf *bfile, *boutfile;
 	hitobject *np;
 	rgline *rlp;
 	double t;
 	int i;
 	float angle;
-
-	if (argc < 2) {
-		fprint(2, "usage: %s file.osu\n", argv[0]);
-		exits("usage");
-	}
-
-	bfile = Bopen(argv[1], OREAD);
-	if (bfile == nil) {
-		fprint(2, "%r\n");
-		exits("Bopen");
-	}
-
-	bmp = mkbeatmap();
-	if (readmap(bfile, bmp) < 0) {
-		Bterm(bfile);
-		fprint(2, "%r\n");
-		exits("readmap");
-	}
-	Bterm(bfile);
 
 	i = 0;
 	angle = 0;
@@ -125,8 +104,49 @@ main(int argc, char *argv[])
 			angle += 0.1;
 		if (i % 16 == 0)
 			np->newcombo = 1;
-		rotate(&np->x, &np->y, 256, 192, angle);
+		rotate(&np->anchors->x, &np->anchors->y, 256, 192, angle);
 	}
+
+	return 0;
+}
+
+void
+main(int argc, char *argv[])
+{
+	beatmap *bmp;
+	Biobuf *bfile, *boutfile;
+
+	if (argc < 2) {
+		fprint(2, "usage: %s file.osu\n", argv[0]);
+		exits("usage");
+	}
+
+	bfile = Bopen(argv[1], OREAD);
+	if (bfile == nil) {
+		fprint(2, "%r\n");
+		exits("Bopen");
+	}
+
+	bmp = mkbeatmap();
+	if (readmap(bfile, bmp) < 0) {
+		Bterm(bfile);
+		fprint(2, "%r\n");
+		exits("readmap");
+	}
+	Bterm(bfile);
+
+	int nanchors;
+	anchor *ap;
+	hitobject *op;
+
+	for (op = bmp->objects; op != nil; op = op->next) {
+		nanchors = 0;
+		for (ap = op->anchors; ap != nil; ap = ap->next)
+			nanchors++;
+
+		print("%G\n", bezierlen(op->anchors, nanchors));
+	}
+	exits(0);
 
 	boutfile = ecalloc(1, sizeof(Biobuf));
 	Binit(boutfile, 1, OWRITE);
@@ -134,4 +154,6 @@ main(int argc, char *argv[])
 
 	Bterm(boutfile);
 	nukebeatmap(bmp);
+
+	exits(0);
 }

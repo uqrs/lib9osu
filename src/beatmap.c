@@ -1064,14 +1064,14 @@ writehitobjects(Biobuf *bp, hitobject *objects)
 		if (np->newcombo > 0)
 			typebits |= TBNEWCOMBO;
 
-		Bprint(bp, "%d,%d,%.16G,%d,%d", np->x, np->y, np->t, typebits, np->additions);
+		Bprint(bp, "%d,%d,%.16G,%d,%d", np->anchors->x, np->anchors->y, np->t, typebits, np->additions);
 
 		switch(np->type) {
 		case TCIRCLE:
 			break;
 		case TSLIDER:
 			Bprint(bp, ",%c", np->curve);
-			for (ap = np->anchors; ap != nil; ap = ap->next)
+			for (ap = np->anchors->next; ap != nil; ap = ap->next)
 				Bprint(bp, "|%d:%d", ap->x, ap->y);
 
 			Bprint(bp, ",%d,%.16G", np->slides, np->length);

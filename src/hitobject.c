@@ -10,13 +10,14 @@ hitobject *
 mkobj(uchar type, double t, int x, int y)
 {
 	hitobject *new;
+	anchor *ap;
 
 	new = ecalloc(1, sizeof(hitobject));
+	ap = mkanch(x, y);
 
 	new->type = type;
 	new->t = t;
-	new->x = x;
-	new->y = y;
+	new->anchors = ap;
 	new->next = nil;
 
 	return new;
@@ -251,4 +252,75 @@ addanchn(anchor *alistp, anchor *ap, uint n)
 	np->next = ap;
 
 	return alistp;
+}
+
+/* calculates the distance between points (x1,y1) and (x2,y2)
+  * using Pythagoras' theorem */
+float
+hypotenuselen(float x1, float y1, float x2, float y2)
+{
+	return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
+}
+
+
+/* interpolates a point on a n-order bezier curve denoted by alistp,
+  * where 0 <= t <= 1.
+  * writes the coordinates of this point to *x and *y.
+  * returns 0 on success, negative values for failures.
+  */
+int
+bezierpoint(anchor *alistp, int n, float *x, float *y, float t)
+{
+	float nx, ny;
+	int k;
+	anchor *ap;
+
+	if (alistp == nil || x == nil || y == nil || t < 0 || t > 1)
+		return -1;
+
+	nx = ny = 0;
+
+	ap = alistp;
+	for (k = 0; k <= n; k++) {
+		nx += ap->x * (fact(n) / (fact(k) * fact(n - k))) * pow(1 - t, n - k) * pow(t, k);
+		ny += ap->y * (fact(n) / (fact(k) * fact(n - k))) * pow(1 - t, n - k) * pow(t, k);
+		ap = ap->next;
+	}
+
+	*x = nx;
+	*y = ny;
+
+	return 0;
+}
+
+/* returns the length of the curve denoted by the first
+  * nanchors control points in alistp
+  *
+  * returns the length of the curve in osu! pixels on success,
+  * negative values on failure.
+  */
+float
+bezierlen(anchor *alistp, int nanchors)
+{
+	static float step = 0.0125;
+	float t, len, x1, y1, x2, y2;
+
+	if (alistp == nil || nanchors < 1)
+		return -1;
+
+	len = 0;
+	if (bezierpoint(alistp, nanchors - 1, &x1, &y1, 0) < 0)
+		return -1;
+
+	for (t = step; t < 1; t += step) {
+		if (bezierpoint(alistp, nanchors - 1, &x2, &y2, t) < 0)
+			return -1;
+
+		len += hypotenuselen(x1, y1, x2, y2);
+
+		x1 = x2;
+		y1 = y2;
+	}
+
+	return len;
 }

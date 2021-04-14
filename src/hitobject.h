@@ -26,12 +26,12 @@ typedef struct hitobject {
 	hitobject *next;	/* next node in object list */
 
 	double t;			/* timestamp in ms */
-	int x,y;			/* x and y positions in 'osu pixels' */
+	anchor *anchors;	/* head of anchor list */
 	uchar type;		/* one of enum objtypes */
 	int typebits;		/* remaining type bits (old osu! beatmaps) */
 					/* typebit bits 0 through 7 will be overwritten by the values of type, newcombo,
 					  * and comboskip on write */
-	double length;		/* "visual length in osu! pixels." may be truncated with "no consequences". */
+	float length;		/* "visual length in osu! pixels." may be truncated with "no consequences". */
 
 	/* hitsampling */
 	int additions;		/* bit-flagged integer for additions. see hitsound.h:/additionbits/ */
@@ -49,7 +49,6 @@ typedef struct hitobject {
 	/* sliders */
 	int slides;			/* the amount of times this slider reverses +1 */
 	char curve;		/* one of enum curvetypes */
-	anchor *anchors;	/* head of anchor list */
 
 	/* spinners */
 	double spinnerlength;  /* spinner duration in ms */
@@ -65,3 +64,6 @@ hitobject *lookupobjn(hitobject *listp, uint n);
 hitobject *lookupobjstr(hitobject *listp, int *selected, char *s);
 anchor *mkanch(int x, int y);
 anchor *addanchn(anchor *alistp, anchor *ap, uint n);
+float hypotenuselen(float x1, float y1, float x2, float y2);
+int bezierpoint(anchor *alistp, int n, float *x, float *y, float t);
+float bezierlen(anchor *alistp, int nanchors);

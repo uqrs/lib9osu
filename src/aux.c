@@ -100,3 +100,20 @@ estrdup(char *s)
 		sysfatal("out of memory\n");
 	return new;
 }
+
+double
+fact(int n)
+{
+	double o;
+
+	if (n < 0)
+		return -1;
+	else if (n == 0)
+		return 1;
+
+	o = n;
+	for (--n; n > 0; n--)
+		o *= n;
+
+	return o;
+}
